@@ -1,53 +1,50 @@
 /**
+ * Author: Gabriel Munoz Luna
+ *
  * Description:
- * Button component for the application.
-*/
+ * React Button component for interactive Astro islands.
+ * Uses the shared design token system from button.ts.
+ * Supports multiple variants, sizes, colors, and disabled state.
+ *
+ * @param variant - 'filled' | 'border' | 'empty' (default: 'filled')
+ * @param size - 'small' | 'medium' | 'big' | 'custom' (default: 'medium')
+ * @param color - 'primary' | 'secondary' | 'success' | 'warning' (default: 'primary')
+ * @param customSizeClass - Custom Tailwind size classes when size is 'custom'
+ * @param disabled - Whether the button is disabled
+ * @returns React Button element
+ */
 
-import React from "react";
+import type { ButtonVariant, ButtonColor, ButtonSize } from "@type/button";
+import { getButtonClasses } from "@type/button";
 
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'filled' | 'border' | 'empty';
-  size?: 'small' | 'medium' | 'big' | 'custom';
-  color?: 'primary' | 'secondary' | 'success' | 'warning';
+  variant?: ButtonVariant;
+  size?: ButtonSize;
+  color?: ButtonColor;
   customSizeClass?: string;
 }
 
-
-const getClasses = ({
-  variant,
-  size,
-  color,
-  customSizeClass = "",
-}: Required<Pick<ButtonProps, 'variant' | 'size' | 'color' | 'customSizeClass'>>) => {
-  const base = "rounded font-medium";
-  const sizeMap = {
-    small: "px-2 py-1 text-sm",
-    medium: "px-4 py-2 text-base",
-    big: "px-6 py-3 text-lg",
-    custom: customSizeClass,
-  };
-  const colorMap = {
-    primary: "bg-blue-500 hover:bg-blue-600 text-white",
-    success: "bg-green-500 hover:bg-green-600 text-white",
-    warning: "bg-red-500 hover:bg-red-600 text-white",
-    secondary: "bg-gray-500 hover:bg-gray-600 text-white",
-  };
-  return `${base} ${sizeMap[size]} ${colorMap[color]}`;
-};
-
-
 export default function Button({
   children,
-  customSizeClass = "",
   variant = "filled",
   size = "medium",
   color = "primary",
+  customSizeClass = "",
+  className = "",
+  disabled = false,
   ...props
 }: ButtonProps) {
-  const className = getClasses({ variant, size, color, customSizeClass });
+  const classList = getButtonClasses({
+    variant,
+    disabled,
+    size,
+    color,
+    customSizeClass,
+    extraClass: className,
+  });
 
   return (
-    <button {...props} className={className}>
+    <button {...props} disabled={disabled} className={classList}>
       {children}
     </button>
   );
