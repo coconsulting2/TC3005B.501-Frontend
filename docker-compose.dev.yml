@@ -1,0 +1,41 @@
+# Frontend dev stack with hot-reload via `astro dev`.
+#
+#   bun run docker:dev          # foreground, streams logs
+#   bun run docker:dev:build    # rebuild base image first
+#   bun run docker:dev:down     # stop containers
+#   bun run docker:dev:clean    # stop AND wipe volumes (full reset)
+#
+# This stack only contains the frontend. Run the backend repo's
+# `bun run docker:dev` separately in another terminal — the browser
+# will reach the backend at https://localhost:3000 (host port).
+#
+# Source is bind-mounted into /app and `astro dev` watches it via Vite,
+# so file edits on the host hot-reload in the browser.
+name: cocoscheme-frontend-dev
+
+services:
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      target: deps
+    restart: unless-stopped
+    environment:
+      NODE_ENV: development
+      HOST: 0.0.0.0
+      # Astro inlines PUBLIC_* vars at build time. In dev (`astro dev`) Vite
+      # re-evaluates them on each reload, so the value the browser sees
+      # matches whatever's set when the dev server starts.
+      PUBLIC_API_BASE_URL: https://localhost:3000/api
+      PUBLIC_IS_DEV: "true"
+    ports:
+      - "4321:4321"
+    volumes:
+      # Bind-mount source for hot reload (Vite picks up file changes).
+      - ./:/app
+      # Override host node_modules with the clean linux build inside the container.
+      - node_modules_dev:/app/node_modules
+    command: sh -c "bun install && bunx astro dev --host 0.0.0.0 --port 4321"
+
+volumes:
+  node_modules_dev:
