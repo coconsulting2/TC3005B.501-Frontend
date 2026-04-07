@@ -1,0 +1,14 @@
+node_modules
+.git
+.github
+.env
+.env.*
+.vscode
+dist
+.astro
+cypress
+cypress.config.ts
+*.md
+Dockerfile
+.dockerignore
+pnpm-lock.yaml
