@@ -30,37 +30,62 @@ gh repo clone 101-Coconsulting/TC3005B.501-Frontend
 
 ### Dependencies
 
-The dependencies for this project are managed using [the pnpm package manager](https://pnpm.io/), so it is recommended to use this. However, [npm](https://www.npmjs.com/) can also be used. The dependencies are automatically managed by `pnpm` in the `package.json` file, so they are installed automatically when issuing the install command.
-
-#### Using `pnpm`
+This project uses [Bun](https://bun.com/) as its package manager and script runner. Install dependencies from the root of the repository:
 
 ```sh
-pnpm install
-```
-
-#### Using `npm`
-
-```sh
-npm install
+bun install
 ```
 
 ### Running
 
-To run the Frontend, utilize whichever package manager you used for dependencies to run the project.
-
-#### Using `pnpm`
-
 ```sh
-pnpm run dev
+bun run dev
 ```
 
-#### Using `npm`
+A browser window should open automatically with the login page (HTTPS via the `@vitejs/plugin-basic-ssl` self-signed cert — accept the warning on first visit).
+
+---
+
+## Running with Docker
+
+The repository ships a multi-target Dockerfile (`deps` for dev, `production` for GHCR) plus a `docker-compose.dev.yml` that runs `astro dev` inside a container with the host source bind-mounted.
+
+### Local development with hot-reload
 
 ```sh
-npm run dev
+bun run docker:dev          # foreground, streams logs
+bun run docker:dev:build    # rebuild image first
+bun run docker:dev:down     # stop containers
+bun run docker:dev:clean    # stop AND wipe volumes (full reset)
 ```
 
-And you're good to go! A new browser window should open and you should be able to see the Authorizer's dashboard.
+This brings up the Astro dev server on `https://localhost:4321`. Edits on the host hot-reload via Vite. The backend must be running on `https://localhost:3000` separately (run `bun run docker:dev` in the backend repo in another terminal).
+
+### Pull from GHCR
+
+```sh
+docker run --rm -p 4321:4321 ghcr.io/coconsulting2/tc3005b-501-frontend:latest
+```
+
+The backend must be reachable at `https://localhost:3000/api` from the user's browser — the URL is **baked into the image at build time** because Astro inlines `PUBLIC_*` env vars during the Vite build.
+
+### Image tags
+
+| Tag | Description |
+|-----|-------------|
+| `ghcr.io/coconsulting2/tc3005b-501-frontend:latest` | Latest commit on `main` |
+| `ghcr.io/coconsulting2/tc3005b-501-frontend:sha-<short>` | Pinned to a specific commit |
+
+### Building locally with a custom API URL
+
+```sh
+docker build -t cocoschemefrontend:custom \
+  --build-arg PUBLIC_API_BASE_URL=https://api.example.com/api \
+  .
+docker run --rm -p 4321:4321 cocoschemefrontend:custom
+```
+
+For production builds with a different `PUBLIC_API_BASE_URL`, trigger the `Docker Publish` workflow manually from the Actions tab and supply the `api_base_url` input.
 
 ### Configuring
 
