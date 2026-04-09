@@ -84,5 +84,11 @@ jobs:
         with:
           node-version: 22
 
+      # The repo uses bun.lock, not package-lock.json, so we generate a
+      # throwaway lockfile for npm audit to consume. --ignore-scripts keeps
+      # this fast and avoids running any install hooks.
+      - name: Generate throwaway package-lock.json
+        run: npm install --package-lock-only --ignore-scripts
+
       - name: Run npm audit (high severity and above)
         run: npx --yes better-npm-audit audit --level high --production
