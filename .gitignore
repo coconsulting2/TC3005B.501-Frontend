@@ -1,6 +1,9 @@
 # build output
 dist/
 
+# vitest coverage output
+coverage/
+
 # generated types
 .astro/
 
