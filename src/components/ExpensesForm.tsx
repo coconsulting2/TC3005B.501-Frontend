@@ -1,9 +1,11 @@
-import React, { useState } from "react";
-import UploadFiles from "@components/UploadFiles";
+import React, { useState, useRef } from "react";
+import FileDropZone from "@components/FileDropZone";
+import type { FileDropZoneHandle } from "@components/FileDropZone";
 import Button from "@components/Button.tsx";
 import { submitTravelExpense } from "@components/SubmitTravelWarper";
 import ModalWrapper from "@components/ModalWrapper.tsx";
-import UploadReceiptFiles from "@components/UploadReceiptFiles.tsx";
+
+const API_BASE_URL = import.meta.env.PUBLIC_API_BASE_URL;
 
 interface Props {
   requestId: number;
@@ -17,8 +19,9 @@ export default function ExpensesFormClient({ requestId, token, receiptToReplace 
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [xmlFile, setXmlFile] = useState<File | null>(null);
   const [isInternational, setIsInternational] = useState(false);
-  const [lastReceiptId, setLastReceiptId] = useState<number | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  const dropZoneRef = useRef<FileDropZoneHandle>(null);
 
   const handleSubmit = async () => {
     try {
@@ -29,27 +32,8 @@ export default function ExpensesFormClient({ requestId, token, receiptToReplace 
         setSubmitting(false);
         return;
       }
-      
-      if (pdfFile && !pdfFile.name.toLowerCase().endsWith('.pdf')) {
-        alert("El archivo debe ser un PDF válido.");
-        setSubmitting(false);
-        return;
-      }
-      
-      if (!isInternational && xmlFile && !xmlFile.name.toLowerCase().endsWith('.xml')) {
-        alert("El archivo debe ser un XML válido.");
-        setSubmitting(false);
-        return;
-      }
 
-      let finalXmlFile = xmlFile;
-      if (isInternational && !xmlFile) {
-        const response = await fetch("/default.xml");
-        const blob = await response.blob();
-        finalXmlFile = new File([blob], "default.xml", { type: "application/xml" });
-        setXmlFile(finalXmlFile);
-      }
-
+      // 1. Create the receipt record
       const { lastReceiptId } = await submitTravelExpense({
         requestId,
         concepto,
@@ -57,24 +41,51 @@ export default function ExpensesFormClient({ requestId, token, receiptToReplace 
         token,
       });
 
-      
-      setLastReceiptId(lastReceiptId);
+      if (!lastReceiptId) {
+        alert("No se pudo crear el comprobante.");
+        setSubmitting(false);
+        return;
+      }
 
+      // 2. If replacing an old receipt, delete it first
+      if (receiptToReplace) {
+        try {
+          await fetch(`${API_BASE_URL}/applicant/delete-receipt/${receiptToReplace}`, {
+            method: "DELETE",
+            headers: { Authorization: `Bearer ${token}` },
+          });
+        } catch (delErr) {
+          console.error("Error eliminando comprobante anterior:", delErr);
+        }
+      }
+
+      // 3. Upload files via FileDropZone's imperative handle (real progress bar)
+      const uploadUrl = `${API_BASE_URL}/files/upload-receipt-files/${lastReceiptId}`;
+      await dropZoneRef.current!.upload(uploadUrl);
+
+      // 4. Done — redirect
+      window.location.href = `/comprobar-solicitud/${requestId}`;
     } catch (err) {
       console.error(err);
-      //alert("Error al enviar la comprobación");
       setSubmitting(false);
     }
   };
 
   return (
-    <div className="space-y-8">
-      <div className="grid md:grid-cols-4 gap-4 mb-4">
+    <div className="space-y-6">
+      {/* ── Form fields ── */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
         <div>
-          <label className="text-sm font-medium">Concepto</label>
+          <label
+            htmlFor="concepto"
+            className="block text-sm font-medium mb-1.5 text-[var(--color-ink-secondary)]"
+          >
+            Concepto
+          </label>
           <select
+            id="concepto"
             name="concepto"
-            className="w-full border rounded-md px-3 py-2"
+            className="w-full border border-[var(--color-neutral-300)] rounded-[var(--radius-md)] px-3 py-2.5 text-sm bg-[var(--color-surface-white)] text-[var(--color-ink)] focus:outline-none focus:ring-2 focus:ring-primary-200 focus:border-primary-400 transition-colors"
             value={concepto}
             onChange={(e) => setConcepto(e.target.value)}
           >
@@ -88,11 +99,17 @@ export default function ExpensesFormClient({ requestId, token, receiptToReplace 
           </select>
         </div>
         <div>
-          <label className="text-sm font-medium">Monto</label>
+          <label
+            htmlFor="monto"
+            className="block text-sm font-medium mb-1.5 text-[var(--color-ink-secondary)]"
+          >
+            Monto
+          </label>
           <input
+            id="monto"
             type="number"
             step="0.01"
-            className="w-full border rounded-md px-3 py-2"
+            className="w-full border border-[var(--color-neutral-300)] rounded-[var(--radius-md)] px-3 py-2.5 text-sm bg-[var(--color-surface-white)] text-[var(--color-ink)] placeholder:text-[var(--color-ink-subtle)] focus:outline-none focus:ring-2 focus:ring-primary-200 focus:border-primary-400 transition-colors"
             placeholder="Ej. 443.50"
             value={monto}
             onChange={(e) => setMonto(e.target.value)}
@@ -101,13 +118,27 @@ export default function ExpensesFormClient({ requestId, token, receiptToReplace 
         </div>
       </div>
 
-      <UploadFiles
+      {/* ── International toggle ── */}
+      <label className="flex items-center gap-2 text-sm text-[var(--color-ink-secondary)] cursor-pointer">
+        <input
+          type="checkbox"
+          checked={isInternational}
+          onChange={(e) => setIsInternational(e.target.checked)}
+          className="accent-primary-400"
+        />
+        Es viaje internacional
+      </label>
+
+      {/* ── Drag & drop file zone ── */}
+      <FileDropZone
+        ref={dropZoneRef}
+        token={token}
+        isInternational={isInternational}
         onPdfChange={setPdfFile}
         onXmlChange={setXmlFile}
-        isInternational={isInternational}
-        setIsInternational={setIsInternational}
       />
 
+      {/* ── Actions ── */}
       <div className="flex justify-end gap-4 pt-4">
         <a href={`/comprobar-solicitud/${requestId}`}>
           <Button type="button" variant="border" color="danger">
@@ -125,26 +156,6 @@ export default function ExpensesFormClient({ requestId, token, receiptToReplace 
           Subir Comprobante
         </ModalWrapper>
       </div>
-
-      {lastReceiptId !== null && (
-        <UploadReceiptFiles
-          token={token}
-          receiptId={lastReceiptId}
-          pdfFile={pdfFile}
-          xmlFile={xmlFile}
-          receiptToReplace={receiptToReplace} // <- pasa el ID aquí
-          onDone={() => {
-            alert("Subidos correctamente");
-            window.location.href = `/comprobar-solicitud/${requestId}`;
-          }}
-          onError={(err) => {
-            console.error("Error al subir archivos:", err);
-            setSubmitting(false);
-          }}
-        />
-
-
-      )}
     </div>
   );
 }
