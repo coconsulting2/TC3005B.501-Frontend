@@ -4,6 +4,7 @@ import type { FileDropZoneHandle } from "@components/FileDropZone";
 import Button from "@components/Button.tsx";
 import { submitTravelExpense } from "@components/SubmitTravelWarper";
 import ModalWrapper from "@components/ModalWrapper.tsx";
+import { apiRequest } from "@utils/apiClient";
 
 const API_BASE_URL = import.meta.env.PUBLIC_API_BASE_URL;
 
@@ -50,7 +51,7 @@ export default function ExpensesFormClient({ requestId, token, receiptToReplace 
       // 2. If replacing an old receipt, delete it first
       if (receiptToReplace) {
         try {
-          await fetch(`${API_BASE_URL}/applicant/delete-receipt/${receiptToReplace}`, {
+          await apiRequest(`/applicant/delete-receipt/${receiptToReplace}`, {
             method: "DELETE",
             headers: { Authorization: `Bearer ${token}` },
           });

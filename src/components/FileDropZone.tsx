@@ -70,6 +70,36 @@ function getExtension(name: string): string {
   return idx >= 0 ? name.slice(idx).toLowerCase() : "";
 }
 
+function apiOriginFromUploadUrl(uploadUrl: string): string {
+  try {
+    return new URL(uploadUrl).origin;
+  } catch {
+    return "";
+  }
+}
+
+/** Misma cookie de sesión `_csrf` que usa `apiClient` para POST JSON. */
+async function fetchCsrfToken(apiOrigin: string): Promise<string> {
+  const res = await fetch(`${apiOrigin}/api/user/csrf-token`, {
+    method: "GET",
+    credentials: "include",
+  });
+  const bodyText = await res.text();
+  if (!res.ok) {
+    throw new Error(`CSRF ${res.status}: ${bodyText.slice(0, 120)}`);
+  }
+  let data: { csrfToken?: string };
+  try {
+    data = bodyText ? JSON.parse(bodyText) : {};
+  } catch {
+    throw new Error("Respuesta CSRF no es JSON");
+  }
+  if (!data?.csrfToken) {
+    throw new Error("Token CSRF ausente");
+  }
+  return data.csrfToken;
+}
+
 function classifyFiles(files: File[]): {
   pdf: File | null;
   xml: File | null;
@@ -105,37 +135,48 @@ function uploadWithProgress(
   token: string,
   onProgress: (pct: number) => void
 ): Promise<UploadResponse> {
-  return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    const formData = new FormData();
-    formData.append("pdf", pdf);
-    formData.append("xml", xml);
+  return (async () => {
+    const origin = apiOriginFromUploadUrl(url);
+    if (!origin) {
+      throw new Error("URL de subida inválida");
+    }
+    const csrfToken = await fetchCsrfToken(origin);
 
-    xhr.upload.addEventListener("progress", (e) => {
-      if (e.lengthComputable) {
-        onProgress(Math.round((e.loaded / e.total) * 100));
-      }
-    });
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      const formData = new FormData();
+      formData.append("pdf", pdf);
+      formData.append("xml", xml);
 
-    xhr.addEventListener("load", () => {
-      if (xhr.status >= 200 && xhr.status < 300) {
-        try {
-          resolve(JSON.parse(xhr.responseText));
-        } catch {
-          reject(new Error("Respuesta inesperada del servidor"));
+      xhr.withCredentials = true;
+
+      xhr.upload.addEventListener("progress", (e) => {
+        if (e.lengthComputable) {
+          onProgress(Math.round((e.loaded / e.total) * 100));
         }
-      } else {
-        reject(new Error(`Error ${xhr.status}: ${xhr.statusText}`));
-      }
+      });
+
+      xhr.addEventListener("load", () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            resolve(JSON.parse(xhr.responseText));
+          } catch {
+            reject(new Error("Respuesta inesperada del servidor"));
+          }
+        } else {
+          reject(new Error(`Error ${xhr.status}: ${xhr.statusText}`));
+        }
+      });
+
+      xhr.addEventListener("error", () => reject(new Error("Error de red al subir archivos")));
+      xhr.addEventListener("abort", () => reject(new Error("Subida cancelada")));
+
+      xhr.open("POST", url);
+      xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+      xhr.setRequestHeader("csrf-token", csrfToken);
+      xhr.send(formData);
     });
-
-    xhr.addEventListener("error", () => reject(new Error("Error de red al subir archivos")));
-    xhr.addEventListener("abort", () => reject(new Error("Subida cancelada")));
-
-    xhr.open("POST", url);
-    xhr.setRequestHeader("Authorization", `Bearer ${token}`);
-    xhr.send(formData);
-  });
+  })();
 }
 
 /* ── Component ── */
