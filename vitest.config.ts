@@ -37,6 +37,9 @@ export default defineConfig({
     setupFiles: ["./tests/setup.ts"],
     include: ["tests/frontend/**/*.test.{ts,tsx}"],
     css: false,
+    env: {
+      PUBLIC_API_BASE_URL: "https://localhost:3000/api",
+    },
     coverage: {
       provider: "v8",
       reporter: ["text", "html", "lcov"],
@@ -49,6 +52,10 @@ export default defineConfig({
         "src/components/FileDropZone.tsx",
         "src/components/ProgressBar.tsx",
         "src/components/Table/DataTable.tsx",
+        "src/components/CfdiSatBadge.tsx",
+        "src/components/XmlExpenseForm.tsx",
+        "src/components/ResumenTramos.tsx",
+        "src/components/UploadReceiptFiles.tsx",
       ],
       thresholds: {
         lines: 70,
