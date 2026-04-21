@@ -1,0 +1,29 @@
+---
+/**
+ * /admin/roles — CRUD de roles y permisos (M2-003).
+ * Integración con API real al liberar M2-00x.
+ */
+
+import EditorialHeader from "@components/EditorialHeader.astro";
+import MainLayout from "@layouts/MainLayout.astro";
+import RolesAdmin from "@components/RolesAdmin";
+import { getCookie } from "@data/cookies";
+import { roleLabels } from "@config/role-labels";
+import type { UserRole } from "@type/roles";
+
+const role: UserRole = getCookie("role", Astro.cookies) as UserRole;
+const buttonLabel = roleLabels[role];
+const userName = getCookie("username", Astro.cookies);
+const token = getCookie("token", Astro.cookies);
+---
+
+<MainLayout title="Roles y permisos" data={{ userName, buttonLabel, role }}>
+  <div>
+    <EditorialHeader
+      eyebrow="Coco / Administración / Roles"
+      title="Roles y permisos"
+      subtitle="Define roles, asigna permisos por módulo y controla el monto máximo de autorización."
+    />
+    <RolesAdmin client:only="react" token={token} />
+  </div>
+</MainLayout>
