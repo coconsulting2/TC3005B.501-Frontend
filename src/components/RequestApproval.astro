@@ -1,39 +1,96 @@
 ---
 /**
- * Author: Julia Maria Stephanie Duenkelsbuehler Castillo Y Nicole Davila
+ * Authors: Julia Maria Stephanie Duenkelsbuehler Castillo, Nicole Davila.
+ * Actualizado (M2-007): Emiliano Deyta Illescas — secciones comprobantes e historial;
+ * solo lectura para roles sin travel_request:authorize; botones accesibles.
  *
- * Description: Detalle de solicitud para autorización; botones solo si hay permiso travel_request:authorize.
+ * Detalle de solicitud de viaje para autorización.
  */
 
-import { getCookie } from '@/data/cookies';
-import RequestDetail from '@components/RequestDetail.astro';
-import TravelRequestAuthorizeActions from '@components/TravelRequestAuthorizeActions.tsx';
+import { getCookie } from "@data/cookies";
+import RequestDetail from "@components/RequestDetail.astro";
+import RequestComprobantesSection from "@components/RequestComprobantesSection.astro";
+import RequestHistorySection from "@components/RequestHistorySection.astro";
+import TravelRequestActionWrapper from "@components/TravelRequestActionWrapper.tsx";
 
 interface Props {
-  request: Record<string, unknown> & { request_id: number };
+  request: Record<string, unknown> & {
+    request_id: number;
+    receipts?: unknown;
+    status_history?: unknown;
+    history?: unknown;
+  };
   canAuthorize: boolean;
 }
 
 const { request, canAuthorize } = Astro.props;
+
+/** Backend: PUT .../authorize-travel-request — user_id debe ser el del autorizador en sesión. */
+const authorizerUserId = getCookie("id", Astro.cookies);
 const id = request.request_id;
+
+const canAct = canAuthorize;
+
+const receipts = Array.isArray(request?.receipts) ? request.receipts : [];
+const history = Array.isArray(request?.status_history)
+  ? request.status_history
+  : Array.isArray(request?.history)
+    ? request.history
+    : [];
 ---
+
 <main class="flex flex-col">
-  <div>
+  <div class="flex flex-col gap-6">
     <RequestDetail
       request={request}
       title={`SOLICITUD #${request.request_id}`}
       subtitle="Detalles de la solicitud"
     />
-    {canAuthorize ? (
-      <TravelRequestAuthorizeActions
-        client:only="react"
-        request_id={id}
-        token={getCookie("token", Astro.cookies)}
-      />
-    ) : (
-      <p class="mt-8 text-sm text-[var(--color-ink-secondary)] max-w-xl">
-        Tu rol solo permite revisar esta solicitud; no tienes permiso para aprobar, rechazar o reasignar.
-      </p>
-    )}
+
+    <RequestComprobantesSection receipts={receipts} />
+    <RequestHistorySection events={history} />
+
+    {
+      canAct ? (
+        <div class="flex flex-col gap-3 mt-2 sm:flex-row sm:justify-end sm:gap-4">
+          <TravelRequestActionWrapper
+            client:only="react"
+            request_id={id}
+            endpoint="/authorizer/authorize-travel-request"
+            user_id={authorizerUserId}
+            title="Confirmar autorización"
+            message="¿Está seguro de que desea autorizar esta solicitud?"
+            redirection="/dashboard"
+            modal_type="success"
+            token={getCookie("token", Astro.cookies)}
+          >
+            Aceptar
+          </TravelRequestActionWrapper>
+
+          <TravelRequestActionWrapper
+            client:only="react"
+            request_id={id}
+            endpoint="/authorizer/decline-travel-request"
+            user_id={authorizerUserId}
+            title="Rechazar autorización"
+            message="¿Está seguro de que desea rechazar esta solicitud?"
+            redirection="/dashboard"
+            modal_type="warning"
+            token={getCookie("token", Astro.cookies)}
+          >
+            Rechazar
+          </TravelRequestActionWrapper>
+        </div>
+      ) : (
+        <div
+          role="note"
+          class="rounded-[var(--radius-md)] border border-[var(--color-neutral-200)] bg-[var(--color-surface-secondary)] px-4 py-3 text-sm text-[var(--color-ink-secondary)] max-w-xl"
+        >
+          Esta vista es de <strong>solo lectura</strong> para tu rol. Solo quienes
+          tienen permiso para autorizar solicitudes de viaje pueden usar Aceptar o
+          Rechazar.
+        </div>
+      )
+    }
   </div>
 </main>
