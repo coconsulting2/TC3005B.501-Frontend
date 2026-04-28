@@ -1,18 +1,20 @@
 ---
 /**
  * Author: Julia Maria Stephanie Duenkelsbuehler Castillo Y Nicole Davila
- * 
- * Description: This Astro page renders an application approval screen.
- * It includes sections for travel details and buttons for authorization and rejection.
+ *
+ * Description: Detalle de solicitud para autorización; botones solo si hay permiso travel_request:authorize.
  */
 
 import { getCookie } from '@/data/cookies';
 import RequestDetail from '@components/RequestDetail.astro';
-import TravelRequestActionWrapper from '@components/TravelRequestActionWrapper.tsx';
+import TravelRequestAuthorizeActions from '@components/TravelRequestAuthorizeActions.tsx';
 
-/** Backend: PUT .../authorize-travel-request/:request_id/:user_id — debe ser el ID del autorizador en sesión. */
-const authorizerUserId = getCookie('id', Astro.cookies);
-const { request } = Astro.props;
+interface Props {
+  request: Record<string, unknown> & { request_id: number };
+  canAuthorize: boolean;
+}
+
+const { request, canAuthorize } = Astro.props;
 const id = request.request_id;
 ---
 <main class="flex flex-col">
@@ -22,34 +24,16 @@ const id = request.request_id;
       title={`SOLICITUD #${request.request_id}`}
       subtitle="Detalles de la solicitud"
     />
-    <div class="flex justify-end gap-4 mt-8">
-      <TravelRequestActionWrapper
+    {canAuthorize ? (
+      <TravelRequestAuthorizeActions
         client:only="react"
         request_id={id}
-        endpoint="/authorizer/authorize-travel-request"
-        user_id={authorizerUserId}
-        title="Confirmar autorización"
-        message="¿Está seguro de que desea autorizar esta solicitud?"
-        redirection="/dashboard"
-        modal_type="success"
         token={getCookie("token", Astro.cookies)}
-        >
-        Aceptar
-      </TravelRequestActionWrapper>
-
-      <TravelRequestActionWrapper
-        client:only="react"
-        request_id={id}
-        endpoint="/authorizer/decline-travel-request"
-        user_id={authorizerUserId}
-        title="Rechazar autorización"
-        message="¿Está seguro de que desea rechazar esta solicitud?"
-        redirection="/dashboard"
-        modal_type="warning"
-        token={getCookie("token", Astro.cookies)}
-        >
-        Rechazar
-      </TravelRequestActionWrapper>
-    </div>
+      />
+    ) : (
+      <p class="mt-8 text-sm text-[var(--color-ink-secondary)] max-w-xl">
+        Tu rol solo permite revisar esta solicitud; no tienes permiso para aprobar, rechazar o reasignar.
+      </p>
+    )}
   </div>
 </main>
