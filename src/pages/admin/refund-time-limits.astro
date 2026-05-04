@@ -1,0 +1,27 @@
+---
+/**
+ * /admin/refund-time-limits — Configura plazo de comprobación de reembolsos (M2-006 RF-37).
+ */
+import EditorialHeader from "@components/EditorialHeader.astro";
+import MainLayout from "@layouts/MainLayout.astro";
+import RefundTimeLimitConfig from "@components/RefundTimeLimitConfig";
+import { getCookie } from "@data/cookies";
+import { roleLabels } from "@config/role-labels";
+import type { UserRole } from "@type/roles";
+
+const role: UserRole = getCookie("role", Astro.cookies) as UserRole;
+const buttonLabel = roleLabels[role];
+const userName = getCookie("username", Astro.cookies);
+const token = getCookie("token", Astro.cookies);
+---
+
+<MainLayout title="Plazo de reembolsos" data={{ userName, buttonLabel, role }}>
+  <div>
+    <EditorialHeader
+      eyebrow="Coco / Administración / Reembolsos"
+      title="Plazo de comprobación"
+      subtitle="Define cuántos días después del fin de viaje los empleados pueden seguir comprobando gastos."
+    />
+    <RefundTimeLimitConfig client:only="react" token={token} />
+  </div>
+</MainLayout>
