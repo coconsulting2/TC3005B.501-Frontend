@@ -5,9 +5,33 @@ import CfdiDevPreview, { isDevTaxPreviewEnabled } from "@components/CfdiDevPrevi
 import Button from "@components/Button.tsx";
 import { submitTravelExpense } from "@components/SubmitTravelWarper";
 import ModalWrapper from "@components/ModalWrapper.tsx";
+import PolicyAlert from "@components/PolicyAlert";
+import PolicyExceptionModal from "@components/PolicyExceptionModal";
 import { apiRequest } from "@utils/apiClient";
 import { extractCfdiTotalFromXml, extractCfdiUuidFromXml } from "@utils/cfdiXml";
 import { showAppAlert } from "@utils/appAlert";
+
+// Mapping concepto (label) → receiptTypeId del seed (M2-006).
+const CONCEPTO_TO_RECEIPT_TYPE_ID: Record<string, number> = {
+  "Hospedaje": 1,
+  "Comida": 2,
+  "Transporte": 3,
+  "Caseta": 4,
+  "Autobús": 5,
+  "Vuelo": 6,
+  "Otro": 7,
+};
+
+interface PolicyPreviewResult {
+  exceeded: boolean;
+  policyId: number | null;
+  capId: number | null;
+  capAmount: number | null;
+  capUnit: string | null;
+  currency: string;
+  excessTotal: number;
+  message: string;
+}
 
 const API_BASE_URL = import.meta.env.PUBLIC_API_BASE_URL;
 
@@ -59,9 +83,43 @@ export default function ExpensesFormClient({ requestId, token, receiptToReplace 
   const [devRegistroResponse, setDevRegistroResponse] = useState<unknown | null>(null);
   const [devRegistroError, setDevRegistroError] = useState<string | null>(null);
   const [uploadSuccess, setUploadSuccess] = useState(false);
+  // M2-006 RF-44 — preview de política y modal de excepción
+  const [policyPreview, setPolicyPreview] = useState<PolicyPreviewResult | null>(null);
+  const [showExceptionModal, setShowExceptionModal] = useState(false);
+  const [exceptionAuthorized, setExceptionAuthorized] = useState(false);
 
   const dropZoneRef = useRef<FileDropZoneHandle>(null);
   const showDevPanel = isDevTaxPreviewEnabled();
+
+  /**
+   * Llama POST /policies/preview para validar el gasto contra la política aplicable.
+   * Si exceeded y aún no se justificó, abre el modal y retorna false (bloquea submit).
+   */
+  async function checkPolicyBeforeSubmit(): Promise<boolean> {
+    if (exceptionAuthorized) return true;
+    const receiptTypeId = CONCEPTO_TO_RECEIPT_TYPE_ID[concepto];
+    if (!receiptTypeId) return true;
+    try {
+      const result = await apiRequest<PolicyPreviewResult>("/policies/preview", {
+        method: "POST",
+        data: {
+          requestId,
+          receiptTypeId,
+          amount: parseFloat(monto),
+          currency: isInternational ? "USD" : "MXN",
+        },
+      });
+      setPolicyPreview(result);
+      if (result.exceeded) {
+        setShowExceptionModal(true);
+        return false;
+      }
+      return true;
+    } catch (e) {
+      console.warn("policy preview failed (allowing submit):", e);
+      return true; // No bloqueamos por fallo de preview — el backend revalida.
+    }
+  }
 
   const onXmlFileChange = (file: File | null) => {
     setXmlFile(file);
@@ -91,6 +149,13 @@ export default function ExpensesFormClient({ requestId, token, receiptToReplace 
         showAppAlert("Por favor, completa todos los campos correctamente.", { variant: "warning" });
         setSubmitting(false);
         return;
+      }
+
+      // M2-006 RF-44 — pre-evaluar contra política antes de subir nada.
+      const policyOk = await checkPolicyBeforeSubmit();
+      if (!policyOk) {
+        setSubmitting(false);
+        return; // El modal solicitará justificación; al aprobar, el usuario reintenta el submit.
       }
 
       let cfdiUuid: string | null = null;
@@ -290,6 +355,18 @@ export default function ExpensesFormClient({ requestId, token, receiptToReplace 
         onXmlChange={onXmlFileChange}
       />
 
+      {/* M2-006 RF-44 — Alerta de política. Solo visible cuando hay preview que excedió. */}
+      {policyPreview && (
+        <PolicyAlert
+          exceeded={policyPreview.exceeded && !exceptionAuthorized}
+          capAmount={policyPreview.capAmount}
+          capUnit={policyPreview.capUnit}
+          currency={policyPreview.currency}
+          message={policyPreview.message}
+          onJustify={() => setShowExceptionModal(true)}
+        />
+      )}
+
       {/* ── Actions ── */}
       <div className="flex justify-end gap-4 pt-4">
         <a href={`/comprobar-solicitud/${requestId}`}>
@@ -309,6 +386,25 @@ export default function ExpensesFormClient({ requestId, token, receiptToReplace 
           Subir Comprobante
         </ModalWrapper>
       </div>
+
+      {policyPreview && (
+        <PolicyExceptionModal
+          open={showExceptionModal}
+          onClose={() => setShowExceptionModal(false)}
+          requestId={requestId}
+          policyId={policyPreview.policyId}
+          capId={policyPreview.capId}
+          amountClaimed={parseFloat(monto) || 0}
+          excessAmount={policyPreview.excessTotal}
+          onCreated={() => {
+            setExceptionAuthorized(true);
+            showAppAlert(
+              "Justificación enviada. Vuelve a presionar 'Subir Comprobante' para completar el registro.",
+              { variant: "info" },
+            );
+          }}
+        />
+      )}
     </div>
   );
 }
