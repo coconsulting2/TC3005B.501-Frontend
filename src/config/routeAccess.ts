@@ -73,6 +73,10 @@ export const roleRoutes: Record<UserRole, string[]> = {
     "/perfil-usuario",
     "/crear-usuario",
     "/editar-usuario/*",
+    // M2-006 — Administración de políticas de viáticos
+    "/admin/expense-policies",
+    "/admin/employee-categories",
+    "/admin/refund-time-limits",
   ],
 };
 

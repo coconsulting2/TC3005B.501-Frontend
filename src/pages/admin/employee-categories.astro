@@ -1,0 +1,27 @@
+---
+/**
+ * /admin/employee-categories — CRUD categorías de empleado (M2-006).
+ */
+import EditorialHeader from "@components/EditorialHeader.astro";
+import MainLayout from "@layouts/MainLayout.astro";
+import EmployeeCategoriesAdmin from "@components/EmployeeCategoriesAdmin";
+import { getCookie } from "@data/cookies";
+import { roleLabels } from "@config/role-labels";
+import type { UserRole } from "@type/roles";
+
+const role: UserRole = getCookie("role", Astro.cookies) as UserRole;
+const buttonLabel = roleLabels[role];
+const userName = getCookie("username", Astro.cookies);
+const token = getCookie("token", Astro.cookies);
+---
+
+<MainLayout title="Categorías de empleado" data={{ userName, buttonLabel, role }}>
+  <div>
+    <EditorialHeader
+      eyebrow="Coco / Administración / Categorías"
+      title="Categorías de empleado"
+      subtitle="Catálogo usado por las políticas de viáticos para diferenciar topes por nivel jerárquico."
+    />
+    <EmployeeCategoriesAdmin client:only="react" token={token} />
+  </div>
+</MainLayout>

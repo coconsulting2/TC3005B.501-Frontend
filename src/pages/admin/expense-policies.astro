@@ -1,0 +1,27 @@
+---
+/**
+ * /admin/expense-policies — CRUD políticas de viáticos (M2-006).
+ */
+import EditorialHeader from "@components/EditorialHeader.astro";
+import MainLayout from "@layouts/MainLayout.astro";
+import ExpensePoliciesAdmin from "@components/ExpensePoliciesAdmin";
+import { getCookie } from "@data/cookies";
+import { roleLabels } from "@config/role-labels";
+import type { UserRole } from "@type/roles";
+
+const role: UserRole = getCookie("role", Astro.cookies) as UserRole;
+const buttonLabel = roleLabels[role];
+const userName = getCookie("username", Astro.cookies);
+const token = getCookie("token", Astro.cookies);
+---
+
+<MainLayout title="Políticas de viáticos" data={{ userName, buttonLabel, role }}>
+  <div>
+    <EditorialHeader
+      eyebrow="Coco / Administración / Políticas"
+      title="Políticas de viáticos"
+      subtitle="Configura topes por categoría de empleado, destino y tipo de gasto, con vigencia controlada."
+    />
+    <ExpensePoliciesAdmin client:only="react" token={token} />
+  </div>
+</MainLayout>
