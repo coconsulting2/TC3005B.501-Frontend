@@ -1,254 +1,48 @@
 ---
 /**
  * Author: Nicole Davila Hernandez
- * Updated: Editorial Finance design system
- *
- * Reimbursement panel — editorial layout with serif numbers.
+ * Updated (M2-006): integración con backend real (/api/refunds/by-user/:userId).
+ *   Reemplaza la data mock por RefundDashboard que carga saldo, historial y
+ *   banner de plazo desde el motor de reglas de reembolso.
  */
 
-import EditorialHeader from '@components/EditorialHeader.astro';
-import MetricCard from '@components/MetricCard.astro';
-import Button from '@components/Button.astro';
+import EditorialHeader from "@components/EditorialHeader.astro";
 import MainLayout from "@layouts/MainLayout.astro";
+import RefundDashboard from "@components/RefundDashboard";
 
 import type { UserRole } from "@type/roles";
 import { getCookie } from "@data/cookies";
 import { roleLabels } from "@config/role-labels";
+import { apiRequest } from "@utils/apiClient";
 
 const role: UserRole = getCookie("role", Astro.cookies) as UserRole;
 const userName = getCookie("username", Astro.cookies);
 const buttonLabel = roleLabels[role];
 
-const currentBalance = 1250.75;
-const reimbursementHistory = [
-  { id: 1, date: '2023-10-15', amount: 850.50, status: 'paid', requestId: 'TRV-2023-045' },
-  { id: 2, date: '2023-09-02', amount: 400.25, status: 'paid', requestId: 'TRV-2023-032' },
-  { id: 3, date: '2023-11-20', amount: 1200.00, status: 'approved', requestId: 'TRV-2023-058' },
-  { id: 4, date: '2023-12-05', amount: 750.00, status: 'pending', requestId: 'TRV-2023-067' }
-];
+const userIdRaw = getCookie("id", Astro.cookies);
+const userId = userIdRaw ? Number(userIdRaw) : null;
 
-const verifiedReceipts = [
-  { id: 1, date: '2023-11-15', amount: 350.00, description: 'Hotel accommodation' },
-  { id: 2, date: '2023-11-16', amount: 125.75, description: 'Meal expenses' },
-  { id: 3, date: '2023-11-17', amount: 85.00, description: 'Transportation' }
-];
-
-const statusPill: Record<string, string> = {
-  paid: 'status-pill--approved',
-  approved: 'status-pill--pending',
-  pending: 'status-pill--review',
-};
-const statusLabel: Record<string, string> = {
-  paid: 'Pagado',
-  approved: 'Aprobado',
-  pending: 'Pendiente',
-};
+let initialData = null;
+if (userId) {
+  try {
+    initialData = await apiRequest(`/refunds/by-user/${userId}`, { cookies: Astro.cookies });
+  } catch (e) {
+    initialData = null; // RefundDashboard hará retry desde el navegador.
+  }
+}
 ---
 
 <MainLayout title="Panel de Reembolsos" data={{ userName, buttonLabel, role }}>
   <div>
     <EditorialHeader
       eyebrow="Coco / Panel de control"
-      title="Reembolsos pendientes"
-      subtitle={`${userName} — Gestión de reembolsos`}
+      title="Reembolsos"
+      subtitle={`${userName} — saldo, historial por solicitud y plazo de comprobación`}
     />
-
-    <!-- Balance metrics -->
-    <div class="flex mb-8">
-      <MetricCard
-        label="Saldo actual"
-        value={`$${currentBalance.toFixed(2)}`}
-        detail={currentBalance >= 0 ? 'La empresa le debe' : 'Usted le debe'}
-        isMoney={true}
-        variant={currentBalance >= 0 ? 'positive' : 'negative'}
-        position="first"
-      />
-      <MetricCard
-        label="Reembolsos"
-        value={String(reimbursementHistory.length)}
-        detail="Total histórico"
-        position="middle"
-      />
-      <MetricCard
-        label="Comprobantes"
-        value={String(verifiedReceipts.length)}
-        detail="Verificados"
-        position="last"
-      />
-    </div>
-
-    <!-- Bank info section -->
-    <section class="card-editorial p-6 mb-6">
-      <div class="flex items-center gap-2 mb-4">
-        <span class="eyebrow">01</span>
-        <h3 class="font-editorial text-lg font-normal text-[var(--color-ink)]">Información bancaria</h3>
-      </div>
-      <p class="text-sm text-[var(--color-ink-muted)] mb-6">
-        Proporcione sus datos bancarios para recibir los reembolsos.
-      </p>
-
-      <form id="bankForm" class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2">
-        <div class="mb-4">
-          <label class="block text-sm font-medium mb-1.5 text-[var(--color-ink-secondary)]">Nombre del banco *</label>
-          <input name="bankName" type="text" required class="block w-full px-3 py-2.5 border border-[var(--color-neutral-300)] rounded-[var(--radius-md)] text-sm bg-[var(--color-surface-white)] focus:outline-none focus:ring-2 focus:ring-primary-200 focus:border-primary-400" />
-        </div>
-        <div class="mb-4">
-          <label class="block text-sm font-medium mb-1.5 text-[var(--color-ink-secondary)]">Nombre del titular *</label>
-          <input name="accountHolder" type="text" required class="block w-full px-3 py-2.5 border border-[var(--color-neutral-300)] rounded-[var(--radius-md)] text-sm bg-[var(--color-surface-white)] focus:outline-none focus:ring-2 focus:ring-primary-200 focus:border-primary-400" />
-        </div>
-        <div class="mb-4">
-          <label class="block text-sm font-medium mb-1.5 text-[var(--color-ink-secondary)]">Numero de cuenta *</label>
-          <input name="accountNumber" type="text" required class="block w-full px-3 py-2.5 border border-[var(--color-neutral-300)] rounded-[var(--radius-md)] text-sm bg-[var(--color-surface-white)] focus:outline-none focus:ring-2 focus:ring-primary-200 focus:border-primary-400" />
-        </div>
-        <div class="mb-4">
-          <label class="block text-sm font-medium mb-1.5 text-[var(--color-ink-secondary)]">Tipo de cuenta *</label>
-          <input name="accountType" type="text" required class="block w-full px-3 py-2.5 border border-[var(--color-neutral-300)] rounded-[var(--radius-md)] text-sm bg-[var(--color-surface-white)] focus:outline-none focus:ring-2 focus:ring-primary-200 focus:border-primary-400" />
-        </div>
-        <div class="mb-4">
-          <label class="block text-sm font-medium mb-1.5 text-[var(--color-ink-secondary)]">Codigo SWIFT/BIC *</label>
-          <input name="swiftCode" type="text" required class="block w-full px-3 py-2.5 border border-[var(--color-neutral-300)] rounded-[var(--radius-md)] text-sm bg-[var(--color-surface-white)] focus:outline-none focus:ring-2 focus:ring-primary-200 focus:border-primary-400" />
-        </div>
-        <div class="mb-4">
-          <label class="block text-sm font-medium mb-1.5 text-[var(--color-ink-secondary)]">Codigo IBAN *</label>
-          <input name="iban" type="text" required class="block w-full px-3 py-2.5 border border-[var(--color-neutral-300)] rounded-[var(--radius-md)] text-sm bg-[var(--color-surface-white)] focus:outline-none focus:ring-2 focus:ring-primary-200 focus:border-primary-400" />
-        </div>
-        <div class="md:col-span-2 flex justify-end pt-2">
-          <Button variant="filled" color="primary" type="submit">
-            Guardar información
-          </Button>
-        </div>
-      </form>
-    </section>
-
-    <!-- Reimbursement request -->
-    {currentBalance > 0 && (
-      <section class="card-editorial p-6 mb-6">
-        <div class="flex items-center gap-2 mb-4">
-          <span class="eyebrow">02</span>
-          <h3 class="font-editorial text-lg font-normal text-[var(--color-ink)]">Solicitud de reembolso</h3>
-        </div>
-        <p class="text-sm text-[var(--color-ink-muted)] mb-6">
-          Puede solicitar hasta <span class="money-display font-medium">${currentBalance.toFixed(2)} USD</span>
-        </p>
-
-        <form id="reimbursementForm" class="space-y-6">
-          <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label class="block text-sm font-medium mb-1.5 text-[var(--color-ink-secondary)]">Monto a solicitar (USD)</label>
-              <input type="number" name="amount" min="0.01" max={currentBalance.toFixed(2)} step="0.01" required
-                class="block w-full px-3 py-2.5 border border-[var(--color-neutral-300)] rounded-[var(--radius-md)] text-sm bg-[var(--color-surface-white)] focus:outline-none focus:ring-2 focus:ring-primary-200 tabular-nums" />
-            </div>
-            <div>
-              <label class="block text-sm font-medium mb-1.5 text-[var(--color-ink-secondary)]">Comprobantes verificados</label>
-              <select name="receipts" multiple required
-                class="block w-full px-3 py-2.5 border border-[var(--color-neutral-300)] rounded-[var(--radius-md)] text-sm bg-[var(--color-surface-white)] focus:outline-none focus:ring-2 focus:ring-primary-200">
-                {verifiedReceipts.map(receipt => (
-                  <option value={receipt.id}>
-                    {receipt.date} — {receipt.description} — ${receipt.amount.toFixed(2)}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-          <div>
-            <label class="block text-sm font-medium mb-1.5 text-[var(--color-ink-secondary)]">Notas adicionales</label>
-            <textarea name="notes" rows={3}
-              class="block w-full px-3 py-2.5 border border-[var(--color-neutral-300)] rounded-[var(--radius-md)] text-sm bg-[var(--color-surface-white)] focus:outline-none focus:ring-2 focus:ring-primary-200 resize-y"></textarea>
-          </div>
-          <div class="flex justify-end">
-            <Button variant="filled" color="primary" type="submit">
-              Solicitar reembolso
-            </Button>
-          </div>
-        </form>
-      </section>
+    {userId ? (
+      <RefundDashboard client:only="react" userId={userId} initialData={initialData} />
+    ) : (
+      <p>No se pudo determinar el usuario. Vuelve a iniciar sesión.</p>
     )}
-
-    <!-- History table -->
-    <section class="card-editorial overflow-hidden">
-      <div class="px-6 py-4 border-b border-[var(--color-neutral-200)] flex items-center gap-2">
-        <span class="eyebrow">03</span>
-        <h3 class="font-editorial text-lg font-normal text-[var(--color-ink)]">Historial de reembolsos</h3>
-      </div>
-      <div class="overflow-x-auto">
-        <table class="min-w-full">
-          <thead>
-            <tr class="border-b border-[var(--color-neutral-200)]">
-              <th class="px-6 py-3 text-left eyebrow">Fecha</th>
-              <th class="px-6 py-3 text-left eyebrow">Monto</th>
-              <th class="px-6 py-3 text-left eyebrow">Estado</th>
-              <th class="px-6 py-3 text-left eyebrow">Solicitud</th>
-            </tr>
-          </thead>
-          <tbody>
-            {reimbursementHistory.map((item, index) => {
-              const isLast = index === reimbursementHistory.length - 1;
-              return (
-                <tr class={`${!isLast ? 'border-b border-[var(--color-neutral-200)]' : ''} hover:bg-[var(--color-surface-secondary)] transition-colors`}>
-                  <td class="px-6 py-4 text-sm text-[var(--color-ink-secondary)] tabular-nums">{item.date}</td>
-                  <td class="px-6 py-4 money-display text-sm">${item.amount.toFixed(2)}</td>
-                  <td class="px-6 py-4">
-                    <span class={`status-pill ${statusPill[item.status]}`}>
-                      {statusLabel[item.status]}
-                    </span>
-                  </td>
-                  <td class="px-6 py-4 text-sm text-primary-500 tabular-nums">
-                    <a href={`/requests/${item.requestId}`} class="hover:text-primary-400 transition-colors">{item.requestId}</a>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    </section>
   </div>
 </MainLayout>
-
-<script is:inline>
-  (function () {
-    var EV = 'coco:alert';
-    var DONE = 'coco:alert-closed';
-    function appAlert(message, variant) {
-      window.dispatchEvent(new CustomEvent(EV, { detail: { message: message, variant: variant || 'info' } }));
-    }
-    function appAlertThen(message, variant, fn) {
-      function onDone() {
-        window.removeEventListener(DONE, onDone);
-        fn();
-      }
-      window.addEventListener(DONE, onDone);
-      appAlert(message, variant);
-    }
-
-    document.getElementById('bankForm')?.addEventListener('submit', function(e) {
-      e.preventDefault();
-      var requiredFields = this.querySelectorAll('[required]');
-      var isValid = true;
-      requiredFields.forEach(function(field) {
-        if (!field.value.trim()) {
-          field.style.borderColor = 'var(--color-accent-400)';
-          isValid = false;
-        } else {
-          field.style.borderColor = '';
-        }
-      });
-      if (!isValid) { appAlert('Complete todos los campos requeridos', 'warning'); return; }
-      appAlert('Información bancaria guardada correctamente', 'success');
-    });
-
-    document.getElementById('reimbursementForm')?.addEventListener('submit', function(e) {
-      e.preventDefault();
-      var amountInput = this.querySelector('[name="amount"]');
-      var amount = parseFloat(amountInput.value);
-      var maxAmount = parseFloat(amountInput.max);
-      if (isNaN(amount) || amount <= 0) { appAlert('Ingrese un monto válido', 'warning'); return; }
-      if (amount > maxAmount) { appAlert('El monto no puede exceder su saldo disponible', 'warning'); return; }
-      var receiptsSelect = this.querySelector('[name="receipts"]');
-      if (receiptsSelect.selectedOptions.length === 0) { appAlert('Seleccione al menos un comprobante', 'warning'); return; }
-      appAlertThen('Solicitud de reembolso enviada correctamente', 'success', function() {
-        window.location.reload();
-      });
-    });
-  })();
-</script>
