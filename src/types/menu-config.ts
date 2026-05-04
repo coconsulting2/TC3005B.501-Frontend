@@ -44,6 +44,10 @@ export const SIDEBAR_CONFIG: Record<string, MenuItem[]> = {
   ],
   'Administrador': [
     { label: 'DASHBOARD', route: '/dashboard', icon: 'home' },
-    { label: 'CREAR USUARIO', route: '/crear-usuario', icon: 'manage_accounts' }
+    { label: 'CREAR USUARIO', route: '/crear-usuario', icon: 'manage_accounts' },
+    // M2-006 — Administración de políticas de viáticos
+    { label: 'POLÍTICAS DE VIÁTICOS', route: '/admin/expense-policies', icon: 'rule' },
+    { label: 'CATEGORÍAS DE EMPLEADO', route: '/admin/employee-categories', icon: 'badge' },
+    { label: 'PLAZO DE REEMBOLSO', route: '/admin/refund-time-limits', icon: 'schedule' }
   ]
 };

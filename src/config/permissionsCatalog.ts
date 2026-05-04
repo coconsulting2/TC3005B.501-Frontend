@@ -37,6 +37,7 @@ export const PERMISSIONS_CATALOG: PermissionModule[] = [
       { code: "gastos.aprobar", label: "Aprobar gastos" },
       { code: "gastos.rechazar", label: "Rechazar gastos" },
       { code: "gastos.reembolso", label: "Procesar reembolsos" },
+      { code: "gastos.excepcion.autorizar", label: "Autorizar excepciones de política" },
     ],
   },
   {
@@ -56,6 +57,9 @@ export const PERMISSIONS_CATALOG: PermissionModule[] = [
       { code: "catalogos.centros.gestionar", label: "Gestionar centros de costos" },
       { code: "catalogos.departamentos.gestionar", label: "Gestionar departamentos" },
       { code: "catalogos.politicas.gestionar", label: "Gestionar políticas" },
+      { code: "catalogos.politicas.ver", label: "Ver políticas de viaje" },
+      { code: "catalogos.categorias-empleado.gestionar", label: "Gestionar categorías de empleado" },
+      { code: "catalogos.plazos-reembolso.gestionar", label: "Configurar plazo de reembolso" },
     ],
   },
   {
