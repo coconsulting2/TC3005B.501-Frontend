@@ -54,6 +54,10 @@ export const SIDEBAR_CONFIG: Record<string, MenuItem[]> = {
     { label: 'PLAZO DE REEMBOLSO', route: '/admin/refund-time-limits', icon: 'schedule' },
     // M3-007 — Importación masiva de usuarios
     { label: 'IMPORTAR USUARIOS', route: '/admin/onboarding-import', icon: 'upload_file' },
+    // M3-007 — Catálogo contable y mapeo de tipos de gasto
+    { label: 'CATÁLOGO CONTABLE', route: '/admin/catalogo-contable', icon: 'account_balance' },
+    { label: 'INDICADORES DE IMPUESTO', route: '/admin/indicadores-impuesto', icon: 'percent' },
+    { label: 'MAPEO DE GASTOS', route: '/admin/mapeo-gastos', icon: 'sync_alt' },
     // M3-009 — Dashboard de gasto por centro de costos
     { label: 'GASTO POR CC', route: '/reportes/gastos-por-centro', icon: 'insights' }
   ],
@@ -65,6 +69,9 @@ export const SIDEBAR_CONFIG: Record<string, MenuItem[]> = {
     { label: 'CATEGORÍAS DE EMPLEADO', route: '/admin/employee-categories', icon: 'badge' },
     { label: 'PLAZO DE REEMBOLSO', route: '/admin/refund-time-limits', icon: 'schedule' },
     { label: 'IMPORTAR USUARIOS', route: '/admin/onboarding-import', icon: 'upload_file' },
+    { label: 'CATÁLOGO CONTABLE', route: '/admin/catalogo-contable', icon: 'account_balance' },
+    { label: 'INDICADORES DE IMPUESTO', route: '/admin/indicadores-impuesto', icon: 'percent' },
+    { label: 'MAPEO DE GASTOS', route: '/admin/mapeo-gastos', icon: 'sync_alt' },
     { label: 'GASTO POR CC', route: '/reportes/gastos-por-centro', icon: 'insights' },
   ],
 };
