@@ -23,6 +23,7 @@ export default defineConfig({
       "@components": r("./src/components"),
       "@layouts": r("./src/layouts"),
       "@pages": r("./src/pages"),
+      "@stores": r("./src/stores"),
       "@type": r("./src/types"),
       "@utils": r("./src/utils"),
       "@data": r("./src/data"),

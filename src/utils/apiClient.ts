@@ -19,6 +19,7 @@
 */
 
 import { getSession } from "@data/cookies";
+import { getImpersonatedOrgId } from "@stores/organizationStore";
 
 const DEFAULT_API = "https://localhost:3000/api";
 
@@ -117,6 +118,10 @@ export async function apiRequest<T = any>(
     }
   }
 
+  // Multi-tenant: super-admin Ditta puede impersonar otra org enviando X-Organization-Id.
+  // El backend valida que el JWT tenga organization_kind=ROOT antes de respetar el header.
+  const impersonatedOrgId = typeof window !== "undefined" ? getImpersonatedOrgId() : null;
+
   const config: RequestInit = {
     method,
     credentials: "include",
@@ -124,6 +129,7 @@ export async function apiRequest<T = any>(
       'Content-Type': 'application/json',
       ...(token ? { Authorization: `Bearer ${token}` } : {}),
       ...(csrfToken ? { "csrf-token": csrfToken } : {}),
+      ...(impersonatedOrgId ? { "X-Organization-Id": impersonatedOrgId } : {}),
       ...headers,
     },
     ...(data && { body: JSON.stringify(data) }),
