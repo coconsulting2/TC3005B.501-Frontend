@@ -1,0 +1,1183 @@
+/**
+ * OnboardingImportAdmin — importación masiva de usuarios (JSON / CSV).
+ *
+ * Flujo:
+ *   1. Drag & drop o selección de archivo.
+ *   2. POST /preview → tabla de vista previa + errores.
+ *   3. Botón "Importar" → POST /apply → resultado.
+ */
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { uploadImportPreview, applyImportPreview } from "@utils/uploadOnboarding";
+import type {
+  PreviewImportResponse,
+  ApplyImportResponse,
+  ImportValidationError,
+  ImportConflict,
+  PermissionsCatalog,
+  ImportUserPreview,
+} from "@type/onboardingImport";
+import { getPermissionFriendlyLabel } from "@utils/permissionLabels";
+
+/** Misma regla que el backend (importación). */
+const ONBOARDING_PASSWORD_RE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+const PASSWORD_HINT =
+  "Mínimo 8 caracteres, una mayúscula, una minúscula y un número.";
+
+/** Tokens visuales alineados con global.css (Coco / editorial). */
+const T = {
+  ink: "var(--color-ink)",
+  inkSecondary: "var(--color-ink-secondary)",
+  inkMuted: "var(--color-ink-muted)",
+  surface: "var(--color-surface-white)",
+  surfaceMuted: "var(--color-surface-secondary)",
+  surfaceTertiary: "var(--color-surface-tertiary)",
+  border: "var(--color-neutral-300)",
+  borderSoft: "var(--color-neutral-200)",
+  rowAlt: "var(--color-surface-secondary)",
+  headerBg: "var(--color-surface-tertiary)",
+  primary: "var(--color-primary-500)",
+  primarySoft: "var(--color-primary-100)",
+  primaryWash: "var(--color-primary-50)",
+  success: "var(--color-success-500)",
+  successSoft: "var(--color-success-50)",
+  warning: "var(--color-warning-500)",
+  warningBg: "var(--color-warning-50)",
+  warningBorder: "var(--color-warning-200)",
+  error: "var(--color-error-500)",
+  errorSoft: "var(--color-error-50)",
+  infoBg: "var(--color-primary-50)",
+  infoBorder: "var(--color-primary-200)",
+  scrim: "rgba(10, 10, 10, 0.42)",
+} as const;
+
+interface Props {
+  /** Org destino para super-admin Ditta que usa impersonación. */
+  orgId?: string;
+}
+
+type Phase = "idle" | "loading" | "preview" | "applying" | "done" | "error";
+
+export default function OnboardingImportAdmin({ orgId }: Props) {
+  const [phase, setPhase]       = useState<Phase>("idle");
+  const [dragging, setDragging] = useState(false);
+  const [fileName, setFileName] = useState<string>("");
+  const [preview, setPreview]   = useState<PreviewImportResponse | null>(null);
+  const [result, setResult]     = useState<ApplyImportResponse | null>(null);
+  const [errorMsg, setErrorMsg] = useState<string>("");
+  /** Etiqueta externa (otra empresa) → rol elegido en esta org */
+  const [roleMappingSelections, setRoleMappingSelections] = useState<Record<string, string>>({});
+  /** userName → permisos directos adicionales (no incluidos en el rol). */
+  const [permissionExtrasByUser, setPermissionExtrasByUser] = useState<
+    Record<string, string[]>
+  >({});
+  const [globalPassword, setGlobalPassword] = useState("");
+  const [passwordOverridesByUser, setPasswordOverridesByUser] = useState<Record<string, string>>({});
+  const [previewApplyError, setPreviewApplyError] = useState("");
+
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (!preview?.previewToken) return;
+    const next: Record<string, string> = {};
+    for (const label of preview.unmappedExternalRoles ?? []) {
+      next[label] = "";
+    }
+    setRoleMappingSelections(next);
+    setPermissionExtrasByUser({});
+    setGlobalPassword("");
+    setPasswordOverridesByUser({});
+    setPreviewApplyError("");
+  }, [preview?.previewToken]);
+
+  const handleFile = useCallback(
+    async (file: File) => {
+      setFileName(file.name);
+      setPhase("loading");
+      setErrorMsg("");
+      setPreviewApplyError("");
+      setPreview(null);
+      setResult(null);
+      try {
+        const res = await uploadImportPreview(file, orgId);
+        setPreview(res);
+        setPhase("preview");
+      } catch (e: unknown) {
+        setErrorMsg(e instanceof Error ? e.message : String(e));
+        setPhase("error");
+      }
+    },
+    [orgId]
+  );
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      setDragging(false);
+      const file = e.dataTransfer.files?.[0];
+      if (file) handleFile(file);
+    },
+    [handleFile]
+  );
+
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) handleFile(file);
+    // Reset input para permitir re-subir el mismo archivo
+    e.target.value = "";
+  };
+
+  const handleApply = async () => {
+    if (!preview?.previewToken) return;
+
+    const g = globalPassword.trim();
+    if (g && !ONBOARDING_PASSWORD_RE.test(g)) {
+      setPreviewApplyError(`Contraseña global: ${PASSWORD_HINT}`);
+      return;
+    }
+    for (const [un, pwd] of Object.entries(passwordOverridesByUser)) {
+      const t = pwd.trim();
+      if (t && !ONBOARDING_PASSWORD_RE.test(t)) {
+        setPreviewApplyError(`Contraseña para «${un}»: ${PASSWORD_HINT}`);
+        return;
+      }
+    }
+    setPreviewApplyError("");
+
+    setPhase("applying");
+    try {
+      const maps: Record<string, string> = {};
+      for (const label of preview.unmappedExternalRoles ?? []) {
+        const v = roleMappingSelections[label]?.trim();
+        if (v) maps[label] = v;
+      }
+      const extrasPayload: Record<string, string[]> = {};
+      for (const [un, codes] of Object.entries(permissionExtrasByUser)) {
+        if (codes.length > 0) extrasPayload[un] = codes;
+      }
+      const pwdOverrides: Record<string, string> = {};
+      for (const [un, pwd] of Object.entries(passwordOverridesByUser)) {
+        if (pwd.trim()) pwdOverrides[un] = pwd.trim();
+      }
+
+      const res = await applyImportPreview(preview.previewToken, orgId, {
+        roleMappings: preview.needsRoleMappingCount > 0 ? maps : undefined,
+        permissionExtras:
+          Object.keys(extrasPayload).length > 0 ? extrasPayload : undefined,
+        passwordGlobal: g || undefined,
+        passwordOverrides: Object.keys(pwdOverrides).length > 0 ? pwdOverrides : undefined,
+      });
+      setResult(res);
+      setPhase("done");
+    } catch (e: unknown) {
+      setErrorMsg(e instanceof Error ? e.message : String(e));
+      setPhase("error");
+    }
+  };
+
+  const reset = () => {
+    setPhase("idle");
+    setFileName("");
+    setPreview(null);
+    setResult(null);
+    setErrorMsg("");
+    setRoleMappingSelections({});
+    setPermissionExtrasByUser({});
+    setGlobalPassword("");
+    setPasswordOverridesByUser({});
+    setPreviewApplyError("");
+  };
+
+  return (
+    <div style={{ maxWidth: 960, margin: "0 auto", fontFamily: "inherit" }}>
+
+      {/* ── Zona de drop ── */}
+      {(phase === "idle" || phase === "error") && (
+        <div
+          onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={handleDrop}
+          onClick={() => inputRef.current?.click()}
+          style={{
+            border: `2px dashed ${dragging ? T.primary : T.border}`,
+            borderRadius: 12,
+            padding: "48px 32px",
+            textAlign: "center",
+            cursor: "pointer",
+            background: dragging ? T.primaryWash : T.surfaceMuted,
+            transition: "all 0.15s",
+            marginBottom: 24,
+          }}
+        >
+          <span className="material-symbols-outlined" style={{ fontSize: 48, color: T.inkMuted, display: "block", marginBottom: 8 }}>
+            upload_file
+          </span>
+          <p style={{ margin: 0, fontWeight: 600, color: T.inkSecondary }}>
+            Arrastra tu archivo aquí o haz clic para seleccionarlo
+          </p>
+          <p style={{ margin: "6px 0 0", fontSize: 13, color: T.inkMuted }}>
+            Se aceptan archivos <strong>JSON</strong> y <strong>CSV</strong> (máx. 2 MB)
+          </p>
+          <input
+            ref={inputRef}
+            type="file"
+            accept=".json,.csv,.txt"
+            onChange={handleInputChange}
+            style={{ display: "none" }}
+          />
+        </div>
+      )}
+
+      {/* ── Cargando ── */}
+      {phase === "loading" && (
+        <StatusBanner color={T.primary}>
+          Analizando <strong>{fileName}</strong>…
+        </StatusBanner>
+      )}
+
+      {/* ── Error ── */}
+      {phase === "error" && (
+        <StatusBanner color={T.error}>
+          {errorMsg}
+          <ResetButton onClick={reset} />
+        </StatusBanner>
+      )}
+
+      {/* ── Preview ── */}
+      {phase === "preview" && preview && (
+        <PreviewPanel
+          preview={preview}
+          fileName={fileName}
+          roleMappingSelections={roleMappingSelections}
+          onRoleMappingChange={setRoleMappingSelections}
+          permissionExtrasByUser={permissionExtrasByUser}
+          onPermissionExtrasChange={setPermissionExtrasByUser}
+          globalPassword={globalPassword}
+          onGlobalPasswordChange={setGlobalPassword}
+          passwordOverridesByUser={passwordOverridesByUser}
+          onPasswordOverrideChange={(userName, value) => {
+            setPasswordOverridesByUser((prev) => ({ ...prev, [userName]: value }));
+          }}
+          applyError={previewApplyError}
+          onDismissApplyError={() => setPreviewApplyError("")}
+          onApply={handleApply}
+          onReset={reset}
+        />
+      )}
+
+      {/* ── Aplicando ── */}
+      {phase === "applying" && (
+        <StatusBanner color={T.primary}>
+          Importando usuarios, por favor espera…
+        </StatusBanner>
+      )}
+
+      {/* ── Done ── */}
+      {phase === "done" && result && (
+        <DonePanel result={result} onReset={reset} />
+      )}
+    </div>
+  );
+}
+
+/* ── Sub-componentes ──────────────────────────────────────────── */
+
+function StatusBanner({
+  children,
+  color,
+}: {
+  children: React.ReactNode;
+  color: string;
+}) {
+  return (
+    <div
+      style={{
+        background: "var(--color-surface-secondary)",
+        border: `1px solid ${color}`,
+        borderRadius: 8,
+        padding: "16px 20px",
+        color,
+        marginBottom: 16,
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+function ResetButton({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      style={{
+        marginLeft: 12,
+        background: "transparent",
+        border: "none",
+        cursor: "pointer",
+        textDecoration: "underline",
+        fontSize: 13,
+        color: "inherit",
+      }}
+    >
+      Intentar de nuevo
+    </button>
+  );
+}
+
+function PreviewPanel({
+  preview,
+  fileName,
+  roleMappingSelections,
+  onRoleMappingChange,
+  permissionExtrasByUser,
+  onPermissionExtrasChange,
+  globalPassword,
+  onGlobalPasswordChange,
+  passwordOverridesByUser,
+  onPasswordOverrideChange,
+  applyError,
+  onDismissApplyError,
+  onApply,
+  onReset,
+}: {
+  preview: PreviewImportResponse;
+  fileName: string;
+  roleMappingSelections: Record<string, string>;
+  onRoleMappingChange: React.Dispatch<React.SetStateAction<Record<string, string>>>;
+  permissionExtrasByUser: Record<string, string[]>;
+  onPermissionExtrasChange: React.Dispatch<React.SetStateAction<Record<string, string[]>>>;
+  globalPassword: string;
+  onGlobalPasswordChange: (v: string) => void;
+  passwordOverridesByUser: Record<string, string>;
+  onPasswordOverrideChange: (userName: string, value: string) => void;
+  applyError: string;
+  onDismissApplyError: () => void;
+  onApply: () => void;
+  onReset: () => void;
+}) {
+  const [extrasModalUser, setExtrasModalUser] = useState<string | null>(null);
+
+  const extrasModalRow = useMemo(
+    () => preview.preview.find((u) => u.userName === extrasModalUser) ?? null,
+    [preview.preview, extrasModalUser]
+  );
+
+  const catalog = preview.permissionsCatalog;
+  const applyableTotal = preview.applyableUsernames?.length ?? preview.validRows;
+
+  const hasErrors    = preview.errors.length > 0;
+  const hasConflicts = preview.conflicts.length > 0;
+  const mappingComplete =
+    !preview.needsRoleMappingCount ||
+    (preview.unmappedExternalRoles ?? []).every(
+      (label) => (roleMappingSelections[label] ?? "").trim() !== ""
+    );
+  const canApply     = preview.validRows > 0 && mappingComplete;
+
+  return (
+    <div>
+      {applyError ? (
+        <div
+          role="alert"
+          style={{
+            marginBottom: 16,
+            padding: "12px 14px",
+            borderRadius: 8,
+            border: `1px solid ${T.error}`,
+            background: "var(--color-error-50)",
+            color: T.error,
+            fontSize: 13,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "flex-start",
+            gap: 12,
+          }}
+        >
+          <span>{applyError}</span>
+          <button
+            type="button"
+            onClick={onDismissApplyError}
+            style={{
+              flexShrink: 0,
+              border: "none",
+              background: "transparent",
+              color: T.error,
+              cursor: "pointer",
+              textDecoration: "underline",
+              fontSize: 12,
+            }}
+          >
+            Cerrar
+          </button>
+        </div>
+      ) : null}
+      {/* Resumen */}
+      <div
+        style={{
+          display: "flex",
+          gap: 12,
+          flexWrap: "wrap",
+          marginBottom: 20,
+        }}
+      >
+        <StatPill label="Total filas"   value={preview.totalRows}   color={T.primary} />
+        <StatPill label="Válidos"       value={preview.validRows}   color={T.success} />
+        <StatPill label="Con errores"   value={preview.invalidRows} color={T.error} />
+        <StatPill label="Conflictos"    value={preview.conflictRows} color={T.warning} />
+      </div>
+
+      <p style={{ fontSize: 13, color: T.inkMuted, marginBottom: 16 }}>
+        Archivo: <strong style={{ color: T.ink }}>{fileName}</strong> · Formato detectado:{" "}
+        <strong style={{ color: T.ink }}>{preview.strategy}</strong>
+      </p>
+
+      {preview.validRows > 0 && (
+        <div
+          style={{
+            marginBottom: 16,
+            padding: "14px 16px",
+            background: T.surfaceMuted,
+            border: `1px solid ${T.border}`,
+            borderRadius: 8,
+            fontSize: 13,
+            color: T.inkSecondary,
+          }}
+        >
+          <strong style={{ color: T.ink }}>Contraseñas</strong>
+          <p style={{ margin: "8px 0 10px", lineHeight: 1.45 }}>
+            Por defecto se usa la contraseña de cada fila del archivo. Puedes definir una{" "}
+            <strong>contraseña común</strong> para todos los usuarios válidos ({applyableTotal}) o
+            sustituir solo en las filas de la tabla. {PASSWORD_HINT}
+          </p>
+          <label style={{ display: "block", marginBottom: 8 }}>
+            <span style={{ display: "block", fontSize: 12, fontWeight: 600, color: T.inkSecondary, marginBottom: 4 }}>
+              Misma contraseña para todo el lote (opcional)
+            </span>
+            <input
+              type="password"
+              autoComplete="new-password"
+              value={globalPassword}
+              onChange={(e) => onGlobalPasswordChange(e.target.value)}
+              placeholder="Dejar vacío = usar la del archivo"
+              style={{
+                width: "100%",
+                maxWidth: 360,
+                padding: "8px 10px",
+                borderRadius: 6,
+                border: `1px solid ${T.border}`,
+                fontSize: 13,
+                background: T.surface,
+              }}
+            />
+          </label>
+          {applyableTotal > preview.preview.length ? (
+            <p style={{ margin: 0, fontSize: 12, color: T.inkMuted }}>
+              Hay {applyableTotal} usuarios a importar; la tabla muestra {preview.preview.length}. La
+              contraseña global aplica también a los que no ves en la tabla.
+            </p>
+          ) : null}
+        </div>
+      )}
+
+      {preview.needsRoleMappingCount > 0 && (
+        <div
+          style={{
+            marginBottom: 16,
+            padding: "14px 16px",
+            background: T.warningBg,
+            border: `1px solid ${T.warningBorder}`,
+            borderRadius: 8,
+            fontSize: 13,
+            color: T.warning,
+          }}
+        >
+          <strong>Roles de otro sistema:</strong> hay{" "}
+          <strong>{preview.needsRoleMappingCount}</strong> usuario
+          {preview.needsRoleMappingCount !== 1 ? "s" : ""} con etiquetas que no coinciden con los
+          roles de esta organización. Asigna cada etiqueta a un rol de CocoConsulting antes de
+          importar.
+          {preview.embeddedRoleMappingsFromFile &&
+            Object.keys(preview.embeddedRoleMappingsFromFile).length > 0 && (
+              <p style={{ margin: "10px 0 0", fontSize: 12, color: T.inkSecondary }}>
+                El JSON puede incluir en la raíz{" "}
+                <code style={{ fontSize: 11, color: T.inkMuted }}>roleMappings</code> para anticipar equivalencias;
+                lo que siga sin resolver aparece aquí.
+              </p>
+            )}
+          <div style={{ marginTop: 14, display: "flex", flexDirection: "column", gap: 10 }}>
+            {(preview.unmappedExternalRoles ?? []).map((label) => (
+              <label
+                key={label}
+                style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10 }}
+              >
+                <span style={{ minWidth: 140, fontWeight: 600 }}>{label}</span>
+                <span style={{ color: T.inkMuted }}>→</span>
+                <select
+                  value={roleMappingSelections[label] ?? ""}
+                  onChange={(e) => {
+                    const v = e.target.value;
+                    onRoleMappingChange((prev) => ({ ...prev, [label]: v }));
+                  }}
+                  style={{
+                    flex: 1,
+                    minWidth: 200,
+                    padding: "8px 10px",
+                    borderRadius: 6,
+                    border: `1px solid ${T.border}`,
+                    fontSize: 13,
+                    background: T.surface,
+                  }}
+                >
+                  <option value="">Selecciona rol en esta organización…</option>
+                  {(preview.rolesCatalog ?? []).map((rc) => (
+                    <option key={rc.roleName} value={rc.roleName}>
+                      {rc.roleName}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {preview.rolesCatalog && preview.rolesCatalog.length > 0 && (
+        <details
+          style={{
+            marginBottom: 16,
+            padding: "12px 14px",
+            background: T.surfaceMuted,
+            border: `1px solid ${T.border}`,
+            borderRadius: 8,
+            fontSize: 13,
+            color: T.inkSecondary,
+          }}
+        >
+          <summary style={{ cursor: "pointer", fontWeight: 600, color: T.ink }}>
+            Roles en esta organización ({preview.rolesCatalog.length}) — permisos por rol
+          </summary>
+          <ul style={{ margin: "12px 0 0", paddingLeft: 18, listStyle: "disc" }}>
+            {preview.rolesCatalog.map((rc) => (
+              <li key={rc.roleName} style={{ marginBottom: 10 }}>
+                <strong>{rc.roleName}</strong>
+                {" "}
+                <span style={{ color: T.inkMuted }}>
+                  ({rc.effectivePermissions.length} permiso
+                  {rc.effectivePermissions.length !== 1 ? "s" : ""})
+                </span>
+                {rc.effectivePermissions.length > 0 && (
+                  <details style={{ marginTop: 4 }}>
+                    <summary style={{ cursor: "pointer", fontSize: 12, color: T.primary }}>
+                      Ver códigos
+                    </summary>
+                    <ul
+                      style={{
+                        margin: "6px 0 0",
+                        paddingLeft: 18,
+                        fontFamily: "ui-monospace, monospace",
+                        fontSize: 11,
+                        maxHeight: 140,
+                        overflowY: "auto",
+                        color: T.inkSecondary,
+                      }}
+                    >
+                      {rc.effectivePermissions.map((code) => (
+                        <li key={code}>{code}</li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
+              </li>
+            ))}
+          </ul>
+        </details>
+      )}
+
+      {/* Tabla de vista previa */}
+      {preview.preview.length > 0 && (
+        <>
+          <h3 style={{ fontSize: 15, fontWeight: 600, marginBottom: 8, color: T.ink }}>
+            Vista previa (primeros {preview.preview.length})
+          </h3>
+          {catalog?.groups?.length ? (
+            <p
+              style={{
+                margin: "0 0 14px",
+                padding: "12px 14px",
+                background: T.infoBg,
+                border: `1px solid ${T.infoBorder}`,
+                borderRadius: 8,
+                fontSize: 13,
+                color: T.inkSecondary,
+                lineHeight: 1.45,
+              }}
+            >
+              <strong>Permisos:</strong> el rol define la base. En el editor verás cada permiso explicado
+              en forma clara; el código técnico solo aparece como referencia pequeña debajo. Puedes añadir{" "}
+              <strong>permisos extra</strong> con el botón de cada fila.{" "}
+              <span style={{ color: T.inkMuted }}>
+                No se pueden quitar aquí permisos que ya trae el rol; cambia el rol en el archivo o edita
+                al usuario después del alta.
+              </span>
+            </p>
+          ) : null}
+          <div style={{ overflowX: "auto", marginBottom: 20 }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+              <thead>
+                <tr style={{ background: T.headerBg }}>
+                  {["Usuario", "Email", "Contraseña", "Rol y permisos", "Departamento"].map((h) => (
+                    <th
+                      key={h}
+                      style={{
+                        padding: "8px 12px",
+                        textAlign: "left",
+                        fontWeight: 600,
+                        color: T.inkSecondary,
+                        borderBottom: `1px solid ${T.border}`,
+                      }}
+                    >
+                      {h}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {preview.preview.map((u, i) => (
+                  <tr
+                    key={`${u.userName}-${i}`}
+                    style={{ background: i % 2 === 0 ? T.surface : T.rowAlt }}
+                  >
+                    <td style={tdStyle}>{u.userName}</td>
+                    <td style={tdStyle}>{u.email}</td>
+                    <td style={tdStyle}>
+                      <input
+                        type="password"
+                        autoComplete="new-password"
+                        value={passwordOverridesByUser[u.userName] ?? ""}
+                        onChange={(e) => onPasswordOverrideChange(u.userName, e.target.value)}
+                        placeholder="Vacío: archivo o global"
+                        style={{
+                          width: "100%",
+                          minWidth: 140,
+                          maxWidth: 200,
+                          padding: "6px 8px",
+                          borderRadius: 6,
+                          border: `1px solid ${T.border}`,
+                          fontSize: 12,
+                          background: T.surface,
+                        }}
+                      />
+                    </td>
+                    <td style={tdStyle}>
+                      {u.needsRoleMapping ? (
+                        <>
+                          <div style={{ fontWeight: 600, color: T.warning }}>
+                            Etiqueta en archivo: {u.externalRoleLabel ?? "—"}
+                          </div>
+                          <span style={{ fontSize: 11, color: T.inkMuted }}>
+                            Pendiente: elige el rol equivalente en el panel de arriba.
+                          </span>
+                        </>
+                      ) : (
+                        <RolePermissionsSummary
+                          row={u}
+                          extraCount={(permissionExtrasByUser[u.userName] ?? []).length}
+                          canEdit={Boolean(catalog?.groups?.length)}
+                          onEdit={() => setExtrasModalUser(u.userName)}
+                        />
+                      )}
+                    </td>
+                    <td style={tdStyle}>{u.department ?? "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </>
+      )}
+
+      <PermissionExtrasModal
+        open={extrasModalUser !== null && extrasModalRow !== null && Boolean(catalog)}
+        row={extrasModalRow}
+        catalog={catalog ?? { groups: [] }}
+        selectedExtras={extrasModalUser ? (permissionExtrasByUser[extrasModalUser] ?? []) : []}
+        onChangeExtras={(codes) => {
+          if (!extrasModalUser) return;
+          onPermissionExtrasChange((prev) => ({ ...prev, [extrasModalUser]: codes }));
+        }}
+        onClose={() => setExtrasModalUser(null)}
+      />
+
+      {/* Errores de validación */}
+      {hasErrors && (
+        <ErrorList title="Errores de validación" items={preview.errors} type="error" />
+      )}
+
+      {/* Conflictos */}
+      {hasConflicts && (
+        <ConflictList conflicts={preview.conflicts} />
+      )}
+
+      {/* Acciones */}
+      <div style={{ display: "flex", gap: 12, marginTop: 24 }}>
+        {canApply && (
+          <button
+            type="button"
+            onClick={onApply}
+            style={{
+              background: T.primary,
+              color: T.surface,
+              border: "none",
+              borderRadius: 8,
+              padding: "10px 24px",
+              fontWeight: 600,
+              cursor: "pointer",
+              fontSize: 14,
+            }}
+          >
+            Importar {preview.validRows} usuario{preview.validRows !== 1 ? "s" : ""}
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={onReset}
+          style={{
+            background: T.surface,
+            color: T.inkSecondary,
+            border: `1px solid ${T.border}`,
+            borderRadius: 8,
+            padding: "10px 24px",
+            fontWeight: 600,
+            cursor: "pointer",
+            fontSize: 14,
+          }}
+        >
+          Cancelar
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function DonePanel({
+  result,
+  onReset,
+}: {
+  result: ApplyImportResponse;
+  onReset: () => void;
+}) {
+  return (
+    <div>
+      <StatusBanner color={T.success}>
+        ✓ Importación completada: <strong>{result.created}</strong> usuario
+        {result.created !== 1 ? "s" : ""} creados
+        {result.skipped > 0 ? `, ${result.skipped} omitidos` : ""}.
+      </StatusBanner>
+      {result.createdUsers.length > 0 && (
+        <div style={{ overflowX: "auto", marginBottom: 16 }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+            <thead>
+              <tr style={{ background: T.headerBg }}>
+                {["ID", "Usuario", "Email"].map((h) => (
+                  <th key={h} style={{ padding: "8px 12px", textAlign: "left", fontWeight: 600, color: T.inkSecondary, borderBottom: `1px solid ${T.border}` }}>
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {result.createdUsers.map((u, i) => (
+                <tr key={u.userId} style={{ background: i % 2 === 0 ? T.surface : T.rowAlt }}>
+                  <td style={tdStyle}>{u.userId}</td>
+                  <td style={tdStyle}>{u.userName}</td>
+                  <td style={tdStyle}>{u.email}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <button
+        type="button"
+        onClick={onReset}
+        style={{
+          background: T.primary,
+          color: T.surface,
+          border: "none",
+          borderRadius: 8,
+          padding: "10px 24px",
+          fontWeight: 600,
+          cursor: "pointer",
+          fontSize: 14,
+          marginTop: 8,
+        }}
+      >
+        Nueva importación
+      </button>
+    </div>
+  );
+}
+
+function StatPill({
+  label,
+  value,
+  color,
+}: {
+  label: string;
+  value: number;
+  color: string;
+}) {
+  return (
+    <div
+      style={{
+        background: T.surfaceMuted,
+        border: `1px solid ${T.border}`,
+        borderRadius: 8,
+        padding: "8px 16px",
+        minWidth: 100,
+        textAlign: "center",
+      }}
+    >
+      <div style={{ fontSize: 22, fontWeight: 700, color }}>{value}</div>
+      <div style={{ fontSize: 12, color: T.inkMuted }}>{label}</div>
+    </div>
+  );
+}
+
+function ErrorList({
+  title,
+  items,
+  type,
+}: {
+  title: string;
+  items: ImportValidationError[];
+  type: "error" | "warning";
+}) {
+  const color = type === "error" ? T.error : T.warning;
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <h4 style={{ fontSize: 14, fontWeight: 600, color, marginBottom: 8 }}>{title}</h4>
+      <ul style={{ margin: 0, paddingLeft: 20, fontSize: 13, color: T.inkSecondary }}>
+        {items.slice(0, 30).map((e, i) => (
+          <li key={i}>
+            Fila {e.row} — <strong>{e.field}</strong>: {e.message}
+          </li>
+        ))}
+        {items.length > 30 && (
+          <li style={{ color: T.inkMuted }}>… y {items.length - 30} errores más.</li>
+        )}
+      </ul>
+    </div>
+  );
+}
+
+function ConflictList({ conflicts }: { conflicts: ImportConflict[] }) {
+  return (
+    <div style={{ marginBottom: 16 }}>
+      <h4 style={{ fontSize: 14, fontWeight: 600, color: T.warning, marginBottom: 8 }}>
+        Conflictos (ya existen en la org, serán omitidos)
+      </h4>
+      <ul style={{ margin: 0, paddingLeft: 20, fontSize: 13, color: T.inkSecondary }}>
+        {conflicts.slice(0, 20).map((c, i) => (
+          <li key={i}>
+            <strong>{c.userName}</strong> ({c.email}) — {c.reason}
+          </li>
+        ))}
+        {conflicts.length > 20 && (
+          <li style={{ color: T.inkMuted }}>… y {conflicts.length - 20} más.</li>
+        )}
+      </ul>
+    </div>
+  );
+}
+
+function RolePermissionsSummary({
+  row,
+  extraCount,
+  canEdit,
+  onEdit,
+}: {
+  row: ImportUserPreview;
+  extraCount: number;
+  canEdit: boolean;
+  onEdit: () => void;
+}) {
+  const roleCodes = row.rolePermissionCodes ?? row.effectivePermissions ?? [];
+  const nRole = roleCodes.length;
+
+  return (
+    <div>
+      <div style={{ fontWeight: 600, color: T.ink }}>{row.roleName}</div>
+      <p style={{ margin: "6px 0 4px", fontSize: 12, color: T.inkMuted }}>
+        {nRole} permiso{nRole !== 1 ? "s" : ""} desde el rol
+        {extraCount > 0 ? (
+          <span style={{ color: T.primary, fontWeight: 600 }}>
+            {" "}
+            · +{extraCount} adicional{extraCount !== 1 ? "es" : ""}
+          </span>
+        ) : null}
+      </p>
+      {canEdit ? (
+        <button
+          type="button"
+          onClick={onEdit}
+          style={{
+            marginTop: 6,
+            padding: "7px 14px",
+            fontSize: 12,
+            fontWeight: 600,
+            color: T.surface,
+            background: T.primary,
+            border: "none",
+            borderRadius: 8,
+            cursor: "pointer",
+          }}
+        >
+          Ver / añadir permisos
+        </button>
+      ) : (
+        <span style={{ fontSize: 11, color: T.inkMuted }}>Sin catálogo de permisos</span>
+      )}
+    </div>
+  );
+}
+
+function PermissionExtrasModal({
+  open,
+  row,
+  catalog,
+  selectedExtras,
+  onChangeExtras,
+  onClose,
+}: {
+  open: boolean;
+  row: ImportUserPreview | null;
+  catalog: PermissionsCatalog;
+  selectedExtras: string[];
+  onChangeExtras: (codes: string[]) => void;
+  onClose: () => void;
+}) {
+  const roleSet = useMemo(() => {
+    const codes = row?.rolePermissionCodes ?? row?.effectivePermissions ?? [];
+    return new Set(codes);
+  }, [row]);
+
+  const selectedSet = useMemo(() => new Set(selectedExtras), [selectedExtras]);
+
+  if (!open || !row) return null;
+
+  const toggleExtra = (code: string) => {
+    if (roleSet.has(code)) return;
+    const next = new Set(selectedExtras);
+    if (next.has(code)) next.delete(code);
+    else next.add(code);
+    onChangeExtras([...next].sort((a, b) => a.localeCompare(b)));
+  };
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="perm-modal-title"
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 100,
+        background: T.scrim,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 16,
+      }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        style={{
+          background: T.surface,
+          borderRadius: 12,
+          maxWidth: 720,
+          width: "100%",
+          maxHeight: "88vh",
+          display: "flex",
+          flexDirection: "column",
+          boxShadow: "0 12px 40px rgba(10, 10, 10, 0.12)",
+          overflow: "hidden",
+          border: `1px solid ${T.border}`,
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <header
+          style={{
+            padding: "16px 20px",
+            borderBottom: `1px solid ${T.border}`,
+            background: T.surfaceMuted,
+          }}
+        >
+          <h3 id="perm-modal-title" style={{ margin: 0, fontSize: 17, color: T.ink }}>
+            Permisos — {row.userName}
+          </h3>
+          <p style={{ margin: "8px 0 0", fontSize: 13, color: T.inkSecondary, lineHeight: 1.45 }}>
+            Rol: <strong style={{ color: T.ink }}>{row.roleName}</strong>. Cada permiso se explica
+            en lenguaje claro; el código técnico (p. ej. <code style={{ fontSize: 11, color: T.inkMuted }}>user:create</code>)
+            solo aparece como referencia. Las casillas{" "}
+            <span style={{ color: T.primary, fontWeight: 600 }}>del rol</span> no se pueden quitar aquí. Marca los
+            adicionales que quieras dar solo a esta persona.
+          </p>
+        </header>
+
+        <div style={{ overflowY: "auto", padding: "16px 20px", flex: 1 }}>
+          {catalog.groups.map((group) => (
+            <section
+              key={group.resource}
+              style={{
+                marginBottom: 22,
+                padding: 14,
+                background: T.surfaceMuted,
+                borderRadius: 10,
+                border: `1px solid ${T.border}`,
+              }}
+            >
+              <h4
+                style={{
+                  margin: "0 0 12px",
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: T.ink,
+                  letterSpacing: "0.02em",
+                  textTransform: "uppercase",
+                }}
+              >
+                {group.label}
+              </h4>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {group.items.map((item) => {
+                  const fromRole = roleSet.has(item.code);
+                  const isExtra = selectedSet.has(item.code);
+                  const checked = fromRole || isExtra;
+                  const { headline, showTechnicalRef } = getPermissionFriendlyLabel(item);
+                  return (
+                    <label
+                      key={item.code}
+                      style={{
+                        display: "flex",
+                        gap: 12,
+                        alignItems: "flex-start",
+                        padding: "10px 12px",
+                        borderRadius: 8,
+                        cursor: fromRole ? "default" : "pointer",
+                        background: fromRole ? T.surface : checked ? T.primaryWash : T.surface,
+                        border: `1px solid ${
+                          fromRole ? T.border : checked ? T.primarySoft : T.border
+                        }`,
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        disabled={fromRole}
+                        onChange={() => toggleExtra(item.code)}
+                        style={{ marginTop: 5, width: 16, height: 16, accentColor: T.primary }}
+                      />
+                      <span style={{ flex: 1, minWidth: 0 }}>
+                        <span
+                          style={{
+                            display: "block",
+                            fontSize: 14,
+                            fontWeight: 600,
+                            color: T.ink,
+                            lineHeight: 1.35,
+                          }}
+                        >
+                          {headline}
+                        </span>
+                        {showTechnicalRef ? (
+                          <span
+                            style={{
+                              display: "block",
+                              marginTop: 4,
+                              fontSize: 11,
+                              color: T.inkMuted,
+                              fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+                              wordBreak: "break-all",
+                            }}
+                          >
+                            Referencia técnica: {item.code}
+                          </span>
+                        ) : null}
+                        <span style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 8 }}>
+                          {fromRole ? (
+                            <span
+                              style={{
+                                fontSize: 11,
+                                fontWeight: 600,
+                                color: T.primary,
+                                background: T.primarySoft,
+                                padding: "3px 8px",
+                                borderRadius: 4,
+                              }}
+                            >
+                              Incluido en el rol
+                            </span>
+                          ) : null}
+                          {!fromRole && isExtra ? (
+                            <span
+                              style={{
+                                fontSize: 11,
+                                fontWeight: 600,
+                                color: T.success,
+                                background: T.successSoft,
+                                padding: "3px 8px",
+                                borderRadius: 4,
+                              }}
+                            >
+                              Adicional al rol
+                            </span>
+                          ) : null}
+                        </span>
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </section>
+          ))}
+        </div>
+
+        <footer
+          style={{
+            padding: "12px 20px",
+            borderTop: `1px solid ${T.border}`,
+            display: "flex",
+            justifyContent: "flex-end",
+            gap: 10,
+            background: T.surfaceMuted,
+          }}
+        >
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              padding: "10px 20px",
+              fontSize: 14,
+              fontWeight: 600,
+              color: T.inkSecondary,
+              background: T.surface,
+              border: `1px solid ${T.border}`,
+              borderRadius: 8,
+              cursor: "pointer",
+            }}
+          >
+            Cerrar
+          </button>
+        </footer>
+      </div>
+    </div>
+  );
+}
+
+const tdStyle: React.CSSProperties = {
+  padding: "8px 12px",
+  borderBottom: `1px solid var(--color-neutral-300)`,
+  color: "var(--color-ink-secondary)",
+};

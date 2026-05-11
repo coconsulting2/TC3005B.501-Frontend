@@ -49,8 +49,21 @@ export const SIDEBAR_CONFIG: Record<string, MenuItem[]> = {
     { label: 'POLÍTICAS DE VIÁTICOS', route: '/admin/expense-policies', icon: 'rule' },
     { label: 'CATEGORÍAS DE EMPLEADO', route: '/admin/employee-categories', icon: 'badge' },
     { label: 'PLAZO DE REEMBOLSO', route: '/admin/refund-time-limits', icon: 'schedule' },
+    // M3-007 — Importación masiva de usuarios
+    { label: 'IMPORTAR USUARIOS', route: '/admin/onboarding-import', icon: 'upload_file' },
     // M3-007 — Catálogo contable y mapeo de tipos de gasto
     { label: 'CATÁLOGO CONTABLE', route: '/admin/catalogo-contable', icon: 'account_balance' },
     { label: 'MAPEO DE GASTOS', route: '/admin/mapeo-gastos', icon: 'sync_alt' }
-  ]
+  ],
+  'Admin Ditta': [
+    { label: 'DASHBOARD', route: '/dashboard', icon: 'home' },
+    { label: 'ORGANIZACIONES', route: '/admin/organizations', icon: 'domain' },
+    { label: 'CREAR USUARIO', route: '/crear-usuario', icon: 'manage_accounts' },
+    { label: 'POLÍTICAS DE VIÁTICOS', route: '/admin/expense-policies', icon: 'rule' },
+    { label: 'CATEGORÍAS DE EMPLEADO', route: '/admin/employee-categories', icon: 'badge' },
+    { label: 'PLAZO DE REEMBOLSO', route: '/admin/refund-time-limits', icon: 'schedule' },
+    { label: 'IMPORTAR USUARIOS', route: '/admin/onboarding-import', icon: 'upload_file' },
+    { label: 'CATÁLOGO CONTABLE', route: '/admin/catalogo-contable', icon: 'account_balance' },
+    { label: 'MAPEO DE GASTOS', route: '/admin/mapeo-gastos', icon: 'sync_alt' },
+  ],
 };

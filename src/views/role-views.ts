@@ -11,6 +11,7 @@ export const roleViews: Record<UserRole, any> = {
     'N1': AuthorizerView,
     'N2': AuthorizerView,
     'Administrador': AdminView,
+    'Admin Ditta': AdminView,
     'Cuentas por pagar': AccountsPayableView,
     'Agencia de viajes': TravelAgencyView,
 };
