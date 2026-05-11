@@ -21,6 +21,7 @@ export const SIDEBAR_CONFIG: Record<string, MenuItem[]> = {
     { label: 'DRAFT SOLICITUDES', route: '/solicitudes-draft', icon: 'draft' },
     { label: 'COMPROBAR GASTOS', route: '/comprobar-gastos', icon: 'payments' },
     { label: 'REEMBOLSOS', route: '/reembolso', icon: 'paid' },
+    { label: 'GASTO POR CC', route: '/reportes/gastos-por-centro', icon: 'insights' },
     { label: 'HISTORIAL DE VIAJES', route: '/historial', icon: 'inventory' }
   ],
   'N2': [
@@ -31,12 +32,14 @@ export const SIDEBAR_CONFIG: Record<string, MenuItem[]> = {
     { label: 'DRAFT SOLICITUDES', route: '/solicitudes-draft', icon: 'draft' },
     { label: 'COMPROBAR GASTOS', route: '/comprobar-gastos', icon: 'payments' },
     { label: 'REEMBOLSOS', route: '/reembolso', icon: 'paid' },
+    { label: 'GASTO POR CC', route: '/reportes/gastos-por-centro', icon: 'insights' },
     { label: 'HISTORIAL DE VIAJES', route: '/historial', icon: 'inventory' }
   ],
   'Cuentas por pagar': [
     { label: 'DASHBOARD', route: '/dashboard', icon: 'home' },
     { label: 'COTIZACIONES', route: '/cotizaciones', icon: 'paid' },
-    { label: 'COMPROBACIONES', route: '/comprobaciones', icon: 'receipt' }
+    { label: 'COMPROBACIONES', route: '/comprobaciones', icon: 'receipt' },
+    { label: 'GASTO POR CC', route: '/reportes/gastos-por-centro', icon: 'insights' }
   ],
   'Agencia de viajes': [
     { label: 'DASHBOARD', route: '/dashboard', icon: 'home' },
@@ -50,7 +53,9 @@ export const SIDEBAR_CONFIG: Record<string, MenuItem[]> = {
     { label: 'CATEGORÍAS DE EMPLEADO', route: '/admin/employee-categories', icon: 'badge' },
     { label: 'PLAZO DE REEMBOLSO', route: '/admin/refund-time-limits', icon: 'schedule' },
     // M3-007 — Importación masiva de usuarios
-    { label: 'IMPORTAR USUARIOS', route: '/admin/onboarding-import', icon: 'upload_file' }
+    { label: 'IMPORTAR USUARIOS', route: '/admin/onboarding-import', icon: 'upload_file' },
+    // M3-009 — Dashboard de gasto por centro de costos
+    { label: 'GASTO POR CC', route: '/reportes/gastos-por-centro', icon: 'insights' }
   ],
   'Admin Ditta': [
     { label: 'DASHBOARD', route: '/dashboard', icon: 'home' },
@@ -60,5 +65,6 @@ export const SIDEBAR_CONFIG: Record<string, MenuItem[]> = {
     { label: 'CATEGORÍAS DE EMPLEADO', route: '/admin/employee-categories', icon: 'badge' },
     { label: 'PLAZO DE REEMBOLSO', route: '/admin/refund-time-limits', icon: 'schedule' },
     { label: 'IMPORTAR USUARIOS', route: '/admin/onboarding-import', icon: 'upload_file' },
+    { label: 'GASTO POR CC', route: '/reportes/gastos-por-centro', icon: 'insights' },
   ],
 };
