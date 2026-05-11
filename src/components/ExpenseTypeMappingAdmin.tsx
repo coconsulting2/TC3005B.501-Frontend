@@ -2,20 +2,18 @@
  * ExpenseTypeMappingAdmin — Associates each ReceiptType (Avión, Hotel, …)
  * to a cargo and abono accounting account, plus an optional tax indicator.
  *
- * Reuses the accounting catalog managed by AccountingAccountAdmin. The
- * cargo dropdown filters accounts whose `type` is "cargo" or "ambos", and
- * the abono dropdown filters "abono" or "ambos". The form enforces that
- * cargo and abono are different accounts.
- *
- * Currently runs on seed data; wire `apiEndpoint`, `accountsEndpoint`,
- * `receiptTypesEndpoint` and `taxIndicatorsEndpoint` to the M3 backend
- * once it is available (all filtered by orgId on the server).
+ * Reuses the catalogs managed by AccountingAccountAdmin and
+ * TaxIndicatorAdmin. The form enforces that cargo and abono are different
+ * accounts. Currently runs on seed data; wire `apiEndpoint`,
+ * `accountsEndpoint`, `receiptTypesEndpoint` and `taxIndicatorsEndpoint`
+ * once the M3 backend ships (all filtered by orgId on the server).
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Button from "@components/Button";
 import Modal from "@components/Modal";
 import Toast from "@components/Toast";
+import { TAX_INDICATOR_TYPE_LABEL } from "@type/AccountingAccount";
 import type {
   AccountingAccount,
   ExpenseTypeMapping,
@@ -57,43 +55,61 @@ const SEED_ACCOUNTS: AccountingAccount[] = [
     accounting_account_id: 1,
     org_id: 1,
     account_number: "6100-001",
-    name: "Gastos de viaje · Avión",
-    type: "cargo",
+    description: "Gastos de viaje · Avión",
+    type: "GASTOS",
+    currency: "MXN",
   },
   {
     accounting_account_id: 2,
     org_id: 1,
     account_number: "6100-002",
-    name: "Gastos de viaje · Hotel",
-    type: "cargo",
+    description: "Gastos de viaje · Hotel",
+    type: "GASTOS",
+    currency: "MXN",
   },
   {
     accounting_account_id: 3,
     org_id: 1,
-    account_number: "6100-003",
-    name: "Gastos de viaje · Alimentos",
-    type: "cargo",
+    account_number: "1107-001",
+    description: "Anticipos a empleados",
+    type: "ANTICIPOS",
+    currency: "MXN",
   },
   {
-    accounting_account_id: 5,
+    accounting_account_id: 4,
     org_id: 1,
     account_number: "2102-001",
-    name: "Cuentas por pagar · Proveedores",
-    type: "abono",
-  },
-  {
-    accounting_account_id: 6,
-    org_id: 1,
-    account_number: "1102-001",
-    name: "Bancos · Cuenta operativa",
-    type: "abono",
+    description: "Cuentas por pagar · Proveedores",
+    type: "ACREEDORES",
+    currency: "MXN",
   },
 ];
 
 const SEED_TAX_INDICATORS: TaxIndicator[] = [
-  { tax_indicator_id: 1, org_id: 1, code: "IVA16", name: "IVA 16% acreditable", rate: 0.16 },
-  { tax_indicator_id: 2, org_id: 1, code: "IVA08", name: "IVA 8% zona fronteriza", rate: 0.08 },
-  { tax_indicator_id: 3, org_id: 1, code: "EXENTO", name: "Exento de IVA", rate: 0 },
+  {
+    tax_indicator_id: 1,
+    org_id: 1,
+    key: "IVA16",
+    description: "IVA 16% acreditable",
+    percentage: 16,
+    type: "IVA_TRASLADADO",
+  },
+  {
+    tax_indicator_id: 2,
+    org_id: 1,
+    key: "RET-IVA",
+    description: "Retención de IVA 10.67%",
+    percentage: 10.67,
+    type: "IVA_RETENIDO",
+  },
+  {
+    tax_indicator_id: 3,
+    org_id: 1,
+    key: "RET-ISR",
+    description: "Retención de ISR 10%",
+    percentage: 10,
+    type: "ISR_RETENIDO",
+  },
 ];
 
 const SEED_MAPPINGS: ExpenseTypeMapping[] = [
@@ -102,7 +118,7 @@ const SEED_MAPPINGS: ExpenseTypeMapping[] = [
     org_id: 1,
     receipt_type_id: 1,
     cargo_account_id: 1,
-    abono_account_id: 5,
+    abono_account_id: 4,
     tax_indicator_id: 1,
   },
   {
@@ -110,7 +126,7 @@ const SEED_MAPPINGS: ExpenseTypeMapping[] = [
     org_id: 1,
     receipt_type_id: 2,
     cargo_account_id: 2,
-    abono_account_id: 5,
+    abono_account_id: 4,
     tax_indicator_id: 1,
   },
 ];
@@ -238,17 +254,19 @@ export default function ExpenseTypeMappingAdmin({
   }, [taxIndicatorsEndpoint, token]);
 
   const cargoAccounts = useMemo(
-    () => accounts.filter((a) => a.type === "cargo" || a.type === "ambos"),
+    () => accounts.filter((a) => a.type === "ANTICIPOS" || a.type === "GASTOS"),
     [accounts]
   );
   const abonoAccounts = useMemo(
-    () => accounts.filter((a) => a.type === "abono" || a.type === "ambos"),
+    () => accounts.filter((a) => a.type === "ACREEDORES"),
     [accounts]
   );
 
   const accountById = useCallback(
     (id: number | null) =>
-      id == null ? null : accounts.find((a) => a.accounting_account_id === id) ?? null,
+      id == null
+        ? null
+        : accounts.find((a) => a.accounting_account_id === id) ?? null,
     [accounts]
   );
 
@@ -269,8 +287,8 @@ export default function ExpenseTypeMappingAdmin({
   );
 
   /**
-   * ReceiptTypes that have not been mapped yet — used to constrain the
-   * dropdown on create so a single ReceiptType cannot be mapped twice.
+   * ReceiptTypes not yet mapped — used to constrain the create dropdown
+   * so a single ReceiptType cannot be mapped twice.
    */
   const availableReceiptTypes = useMemo(() => {
     const usedIds = new Set(
@@ -469,7 +487,7 @@ export default function ExpenseTypeMappingAdmin({
         <p className="text-sm text-[var(--color-ink-muted)]">
           {mappings.length}{" "}
           {mappings.length === 1 ? "mapeo registrado" : "mapeos registrados"} ·{" "}
-          {receiptTypes.length - mappings.length} sin asignar
+          {Math.max(receiptTypes.length - mappings.length, 0)} sin asignar
         </p>
         <Button
           type="button"
@@ -534,7 +552,7 @@ export default function ExpenseTypeMappingAdmin({
                               {cargo.account_number}
                             </span>
                             <span className="text-xs text-[var(--color-ink-muted)]">
-                              {cargo.name}
+                              {cargo.description}
                             </span>
                           </span>
                         ) : (
@@ -548,7 +566,7 @@ export default function ExpenseTypeMappingAdmin({
                               {abono.account_number}
                             </span>
                             <span className="text-xs text-[var(--color-ink-muted)]">
-                              {abono.name}
+                              {abono.description}
                             </span>
                           </span>
                         ) : (
@@ -557,8 +575,11 @@ export default function ExpenseTypeMappingAdmin({
                       </td>
                       <td className="px-6 py-4 text-sm hidden md:table-cell">
                         {tax ? (
-                          <span className="status-pill bg-[var(--color-surface-secondary)] text-[var(--color-ink-secondary)]">
-                            {tax.code}
+                          <span
+                            className="status-pill bg-[var(--color-surface-secondary)] text-[var(--color-ink-secondary)]"
+                            title={TAX_INDICATOR_TYPE_LABEL[tax.type]}
+                          >
+                            {tax.key}
                           </span>
                         ) : (
                           <span className="text-[var(--color-ink-muted)]">—</span>
@@ -679,7 +700,7 @@ export default function ExpenseTypeMappingAdmin({
                     key={a.accounting_account_id}
                     value={a.accounting_account_id}
                   >
-                    {a.account_number} · {a.name}
+                    {a.account_number} · {a.description}
                   </option>
                 ))}
               </select>
@@ -715,7 +736,7 @@ export default function ExpenseTypeMappingAdmin({
                     key={a.accounting_account_id}
                     value={a.accounting_account_id}
                   >
-                    {a.account_number} · {a.name}
+                    {a.account_number} · {a.description}
                   </option>
                 ))}
               </select>
@@ -745,7 +766,7 @@ export default function ExpenseTypeMappingAdmin({
                 <option value="">— Sin indicador —</option>
                 {taxIndicators.map((t) => (
                   <option key={t.tax_indicator_id} value={t.tax_indicator_id}>
-                    {t.code} · {t.name}
+                    {t.key} · {t.description} ({t.percentage}%)
                   </option>
                 ))}
               </select>
