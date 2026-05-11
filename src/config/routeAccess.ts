@@ -1,5 +1,18 @@
 import type { UserRole } from "@type/roles";
 
+/** Rutas compartidas entre administrador de cliente y super-admin Ditta (ROOT). */
+const routesAdministracion: string[] = [
+  "/dashboard",
+  "/perfil-usuario",
+  "/crear-usuario",
+  "/editar-usuario/*",
+  "/admin/expense-policies",
+  "/admin/employee-categories",
+  "/admin/refund-time-limits",
+  "/admin/organizations",
+  "/admin/onboarding-import",
+];
+
 export const roleRoutes: Record<UserRole, string[]> = {
   Solicitante: [
     "/dashboard",
@@ -68,20 +81,8 @@ export const roleRoutes: Record<UserRole, string[]> = {
     "/autorizar-solicitud/*",
     "/subir-comprobante/*",
   ],
-  Administrador: [
-    "/dashboard",
-    "/perfil-usuario",
-    "/crear-usuario",
-    "/editar-usuario/*",
-    // M2-006 — Administración de políticas de viáticos
-    "/admin/expense-policies",
-    "/admin/employee-categories",
-    "/admin/refund-time-limits",
-    // Multi-tenant — Gestión de organizaciones (super-admin Ditta).
-    // El backend valida por permiso organization:list_all; aquí permitimos la ruta
-    // y dejamos que la UI muestre "sin permiso" si el role no es Admin Ditta.
-    "/admin/organizations",
-  ],
+  Administrador: routesAdministracion,
+  "Admin Ditta": routesAdministracion,
 };
 
 export const allWhitelistedRoutes: string[] = Object.values(roleRoutes).flat();
