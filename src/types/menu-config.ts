@@ -48,6 +48,9 @@ export const SIDEBAR_CONFIG: Record<string, MenuItem[]> = {
     // M2-006 — Administración de políticas de viáticos
     { label: 'POLÍTICAS DE VIÁTICOS', route: '/admin/expense-policies', icon: 'rule' },
     { label: 'CATEGORÍAS DE EMPLEADO', route: '/admin/employee-categories', icon: 'badge' },
-    { label: 'PLAZO DE REEMBOLSO', route: '/admin/refund-time-limits', icon: 'schedule' }
+    { label: 'PLAZO DE REEMBOLSO', route: '/admin/refund-time-limits', icon: 'schedule' },
+    // M3-007 — Catálogo contable y mapeo de tipos de gasto
+    { label: 'CATÁLOGO CONTABLE', route: '/admin/catalogo-contable', icon: 'account_balance' },
+    { label: 'MAPEO DE GASTOS', route: '/admin/mapeo-gastos', icon: 'sync_alt' }
   ]
 };
