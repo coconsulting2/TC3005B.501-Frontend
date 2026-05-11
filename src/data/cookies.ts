@@ -34,7 +34,7 @@ function emptySession(): Session {
 }
 
 function resolveCookies(): APIContext["cookies"] | null {
-  // En el navegador (p. ej. islas React) no existe Astro.cookies; es normal.
+  // En SSR sin Astro global el caller debe pasar cookies explícitamente.
   if (typeof globalThis.window !== "undefined") {
     return null;
   }
@@ -48,34 +48,62 @@ function resolveCookies(): APIContext["cookies"] | null {
   return null;
 }
 
-export function getSession(cookies?: APIContext["cookies"]): Session {
-  const realCookies = cookies || resolveCookies();
+/**
+ * Lee una cookie del documento (solo navegador). LoginForm escribe `token`, `role`, etc.
+ * para que apiRequest y fetch desde islas React puedan enviar Authorization Bearer.
+ */
+function readCookieFromDocument(name: string): string {
+  if (typeof document === "undefined") return "";
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = document.cookie.match(new RegExp(`(?:^|;\\s*)${escaped}=([^;]*)`));
+  return match ? decodeURIComponent(match[1].trim()) : "";
+}
 
-  if (!realCookies) {
-    return emptySession();
-  }
+function getSessionFromBrowser(): Session {
+  return {
+    username: readCookieFromDocument("username"),
+    id: readCookieFromDocument("user_id") || readCookieFromDocument("id"),
+    department_id: readCookieFromDocument("department_id"),
+    role: readCookieFromDocument("role") as UserRole,
+    token: readCookieFromDocument("token"),
+  };
+}
 
+function getSessionFromAstro(realCookies: APIContext["cookies"]): Session {
   const username = realCookies.get("username")?.value || "";
-  // Login API (httpOnly) usa cookie `id`; el formulario cliente también setea `user_id`.
   const id =
     realCookies.get("id")?.value ||
     realCookies.get("user_id")?.value ||
     "";
   const department_id = realCookies.get("department_id")?.value || "";
   const role = realCookies.get("role")?.value || "";
-  const token = realCookies.get("token")?.value || ""; 
-  
-  const session: Session = { username, id, department_id, role: role as UserRole, token };
+  const token = realCookies.get("token")?.value || "";
 
-  // if (process.env.NODE_ENV === "development") {
-  //   console.log("[DEBUG] getSession cookies:", session);
-  // }
+  return {
+    username,
+    id,
+    department_id,
+    role: role as UserRole,
+    token,
+  };
+}
 
-  return session;
+export function getSession(cookies?: APIContext["cookies"]): Session {
+  if (cookies) {
+    return getSessionFromAstro(cookies);
+  }
+  if (typeof globalThis.window !== "undefined") {
+    return getSessionFromBrowser();
+  }
+  const astro = resolveCookies();
+  if (astro) {
+    return getSessionFromAstro(astro);
+  }
+  return emptySession();
 }
 
 type CookieKey = Exclude<keyof Session, "permissions">;
 
 export function getCookie(key: CookieKey, cookies?: APIContext["cookies"]): string {
-  return getSession(cookies)[key] ?? '';
+  return getSession(cookies)[key] ?? "";
 }
