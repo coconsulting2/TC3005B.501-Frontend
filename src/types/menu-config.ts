@@ -48,6 +48,17 @@ export const SIDEBAR_CONFIG: Record<string, MenuItem[]> = {
     // M2-006 — Administración de políticas de viáticos
     { label: 'POLÍTICAS DE VIÁTICOS', route: '/admin/expense-policies', icon: 'rule' },
     { label: 'CATEGORÍAS DE EMPLEADO', route: '/admin/employee-categories', icon: 'badge' },
-    { label: 'PLAZO DE REEMBOLSO', route: '/admin/refund-time-limits', icon: 'schedule' }
-  ]
+    { label: 'PLAZO DE REEMBOLSO', route: '/admin/refund-time-limits', icon: 'schedule' },
+    // M3-007 — Importación masiva de usuarios
+    { label: 'IMPORTAR USUARIOS', route: '/admin/onboarding-import', icon: 'upload_file' }
+  ],
+  'Admin Ditta': [
+    { label: 'DASHBOARD', route: '/dashboard', icon: 'home' },
+    { label: 'ORGANIZACIONES', route: '/admin/organizations', icon: 'domain' },
+    { label: 'CREAR USUARIO', route: '/crear-usuario', icon: 'manage_accounts' },
+    { label: 'POLÍTICAS DE VIÁTICOS', route: '/admin/expense-policies', icon: 'rule' },
+    { label: 'CATEGORÍAS DE EMPLEADO', route: '/admin/employee-categories', icon: 'badge' },
+    { label: 'PLAZO DE REEMBOLSO', route: '/admin/refund-time-limits', icon: 'schedule' },
+    { label: 'IMPORTAR USUARIOS', route: '/admin/onboarding-import', icon: 'upload_file' },
+  ],
 };
