@@ -1,10 +1,10 @@
 /**
- * AccountingAccountAdmin — CRUD view for the accounting catalog (M3-008).
+ * TaxIndicatorAdmin — CRUD view for tax indicators (M3-008).
  *
- * Lets the accounting admin register, edit and disable accounting accounts
- * (número, descripción, tipo Anticipos/Gastos/Acreedores, moneda).
- * Accounts already referenced by an active ExpenseTypeMapping cannot be
- * deleted; the UI surfaces this with a disabled action and a tooltip.
+ * Lets the accounting admin register, edit and disable tax indicators
+ * (clave, descripción, porcentaje, tipo IVA trasladado / IVA retenido /
+ * ISR retenido). Indicators referenced by an active ExpenseTypeMapping
+ * cannot be deleted.
  *
  * Includes a CSV export that hits GET /accounting/export?format=csv when
  * available and falls back to a client-side CSV. Catalogs are scoped by
@@ -16,23 +16,22 @@ import Button from "@components/Button";
 import Modal from "@components/Modal";
 import Toast from "@components/Toast";
 import {
-  ACCOUNT_TYPES,
-  ACCOUNT_TYPE_LABEL,
-  COMMON_CURRENCIES,
-  getMappedAccountIds,
+  TAX_INDICATOR_TYPES,
+  TAX_INDICATOR_TYPE_LABEL,
+  getMappedTaxIndicatorIds,
 } from "@type/AccountingAccount";
 import type {
-  AccountingAccount,
-  AccountingAccountFormErrors,
-  AccountingAccountFormValues,
-  AccountingAccountType,
   ExpenseTypeMapping,
+  TaxIndicator,
+  TaxIndicatorFormErrors,
+  TaxIndicatorFormValues,
+  TaxIndicatorType,
 } from "@type/AccountingAccount";
 import { apiRequest } from "@utils/apiClient";
 import { downloadCsvWithBackend } from "@utils/csvExport";
 
-interface AccountingAccountAdminProps {
-  initialData?: AccountingAccount[];
+interface TaxIndicatorAdminProps {
+  initialData?: TaxIndicator[];
   initialMappings?: ExpenseTypeMapping[];
   apiEndpoint?: string;
   mappingsEndpoint?: string;
@@ -43,49 +42,41 @@ interface AccountingAccountAdminProps {
 type Dialog =
   | { kind: "closed" }
   | { kind: "create" }
-  | { kind: "edit"; account: AccountingAccount }
-  | { kind: "delete"; account: AccountingAccount };
+  | { kind: "edit"; indicator: TaxIndicator }
+  | { kind: "delete"; indicator: TaxIndicator };
 
-const SEED_ACCOUNTS: AccountingAccount[] = [
+const SEED_INDICATORS: TaxIndicator[] = [
   {
-    accounting_account_id: 1,
+    tax_indicator_id: 1,
     org_id: 1,
-    account_number: "6100-001",
-    description: "Gastos de viaje · Avión",
-    type: "GASTOS",
-    currency: "MXN",
+    key: "IVA16",
+    description: "IVA 16% acreditable",
+    percentage: 16,
+    type: "IVA_TRASLADADO",
   },
   {
-    accounting_account_id: 2,
+    tax_indicator_id: 2,
     org_id: 1,
-    account_number: "6100-002",
-    description: "Gastos de viaje · Hotel",
-    type: "GASTOS",
-    currency: "MXN",
+    key: "IVA08",
+    description: "IVA 8% zona fronteriza",
+    percentage: 8,
+    type: "IVA_TRASLADADO",
   },
   {
-    accounting_account_id: 3,
+    tax_indicator_id: 3,
     org_id: 1,
-    account_number: "1107-001",
-    description: "Anticipos a empleados",
-    type: "ANTICIPOS",
-    currency: "MXN",
+    key: "RET-IVA",
+    description: "Retención de IVA 10.67%",
+    percentage: 10.67,
+    type: "IVA_RETENIDO",
   },
   {
-    accounting_account_id: 4,
+    tax_indicator_id: 4,
     org_id: 1,
-    account_number: "2102-001",
-    description: "Cuentas por pagar · Proveedores",
-    type: "ACREEDORES",
-    currency: "MXN",
-  },
-  {
-    accounting_account_id: 5,
-    org_id: 1,
-    account_number: "6100-USD-001",
-    description: "Gastos de viaje · Internacional",
-    type: "GASTOS",
-    currency: "USD",
+    key: "RET-ISR",
+    description: "Retención de ISR 10%",
+    percentage: 10,
+    type: "ISR_RETENIDO",
   },
 ];
 
@@ -98,40 +89,32 @@ const SEED_MAPPINGS: ExpenseTypeMapping[] = [
     abono_account_id: 4,
     tax_indicator_id: 1,
   },
-  {
-    expense_type_mapping_id: 2,
-    org_id: 1,
-    receipt_type_id: 2,
-    cargo_account_id: 2,
-    abono_account_id: 4,
-    tax_indicator_id: 1,
-  },
 ];
 
-const emptyForm: AccountingAccountFormValues = {
-  account_number: "",
+const emptyForm: TaxIndicatorFormValues = {
+  key: "",
   description: "",
-  type: "GASTOS",
-  currency: "MXN",
+  percentage: "",
+  type: "IVA_TRASLADADO",
 };
 
-export default function AccountingAccountAdmin({
+export default function TaxIndicatorAdmin({
   initialData,
   initialMappings,
   apiEndpoint,
   mappingsEndpoint,
   exportEndpoint,
   token,
-}: AccountingAccountAdminProps) {
-  const [items, setItems] = useState<AccountingAccount[]>(
-    initialData ?? SEED_ACCOUNTS
+}: TaxIndicatorAdminProps) {
+  const [items, setItems] = useState<TaxIndicator[]>(
+    initialData ?? SEED_INDICATORS
   );
   const [mappings, setMappings] = useState<ExpenseTypeMapping[]>(
     initialMappings ?? SEED_MAPPINGS
   );
   const [dialog, setDialog] = useState<Dialog>({ kind: "closed" });
-  const [form, setForm] = useState<AccountingAccountFormValues>(emptyForm);
-  const [errors, setErrors] = useState<AccountingAccountFormErrors>({});
+  const [form, setForm] = useState<TaxIndicatorFormValues>(emptyForm);
+  const [errors, setErrors] = useState<TaxIndicatorFormErrors>({});
   const [submitting, setSubmitting] = useState(false);
   const [exporting, setExporting] = useState(false);
   const [toast, setToast] = useState<
@@ -143,13 +126,13 @@ export default function AccountingAccountAdmin({
     let cancelled = false;
     (async () => {
       try {
-        const data = await apiRequest<AccountingAccount[]>(apiEndpoint, {
+        const data = await apiRequest<TaxIndicator[]>(apiEndpoint, {
           headers: token ? { Authorization: `Bearer ${token}` } : undefined,
         });
         if (!cancelled && Array.isArray(data)) setItems(data);
       } catch (err) {
         console.warn(
-          "[AccountingAccountAdmin] fetch failed, using seed data",
+          "[TaxIndicatorAdmin] fetch failed, using seed data",
           err
         );
       }
@@ -170,7 +153,7 @@ export default function AccountingAccountAdmin({
         if (!cancelled && Array.isArray(data)) setMappings(data);
       } catch (err) {
         console.warn(
-          "[AccountingAccountAdmin] mappings fetch failed, using seed data",
+          "[TaxIndicatorAdmin] mappings fetch failed, using seed data",
           err
         );
       }
@@ -180,22 +163,18 @@ export default function AccountingAccountAdmin({
     };
   }, [mappingsEndpoint, token]);
 
-  const mappedIds = useMemo(() => getMappedAccountIds(mappings), [mappings]);
+  const mappedIds = useMemo(
+    () => getMappedTaxIndicatorIds(mappings),
+    [mappings]
+  );
 
   const sortedItems = useMemo(
     () =>
       [...items].sort((a, b) =>
-        a.account_number.localeCompare(b.account_number, "es", {
-          sensitivity: "base",
-        })
+        a.key.localeCompare(b.key, "es", { sensitivity: "base" })
       ),
     [items]
   );
-
-  const currencyOptions = useMemo(() => {
-    const fromItems = new Set(items.map((i) => i.currency).filter(Boolean));
-    return Array.from(new Set<string>([...COMMON_CURRENCIES, ...fromItems]));
-  }, [items]);
 
   const openCreate = () => {
     setForm(emptyForm);
@@ -203,15 +182,15 @@ export default function AccountingAccountAdmin({
     setDialog({ kind: "create" });
   };
 
-  const openEdit = (account: AccountingAccount) => {
+  const openEdit = (indicator: TaxIndicator) => {
     setForm({
-      account_number: account.account_number,
-      description: account.description,
-      type: account.type,
-      currency: account.currency,
+      key: indicator.key,
+      description: indicator.description,
+      percentage: String(indicator.percentage),
+      type: indicator.type,
     });
     setErrors({});
-    setDialog({ kind: "edit", account });
+    setDialog({ kind: "edit", indicator });
   };
 
   const closeDialog = () => {
@@ -222,34 +201,39 @@ export default function AccountingAccountAdmin({
 
   const validate = useCallback(
     (
-      values: AccountingAccountFormValues,
+      values: TaxIndicatorFormValues,
       editingId?: number
-    ): AccountingAccountFormErrors => {
-      const next: AccountingAccountFormErrors = {};
-      const accountNumber = values.account_number.trim();
+    ): TaxIndicatorFormErrors => {
+      const next: TaxIndicatorFormErrors = {};
+      const key = values.key.trim();
       const description = values.description.trim();
-      const currency = values.currency.trim().toUpperCase();
+      const percentageStr = values.percentage.trim();
 
-      if (!accountNumber) next.account_number = "El número de cuenta es requerido";
-      else if (!/^[A-Za-z0-9_-]{3,20}$/.test(accountNumber))
-        next.account_number = "3–20 caracteres: letras, números, guion o guion bajo";
+      if (!key) next.key = "La clave es requerida";
+      else if (!/^[A-Za-z0-9_-]{2,20}$/.test(key))
+        next.key = "2–20 caracteres: letras, números, guion o guion bajo";
       else if (
         items.some(
           (i) =>
-            i.account_number.toLowerCase() === accountNumber.toLowerCase() &&
-            i.accounting_account_id !== editingId
+            i.key.toLowerCase() === key.toLowerCase() &&
+            i.tax_indicator_id !== editingId
         )
       )
-        next.account_number = "Este número de cuenta ya existe";
+        next.key = "Esta clave ya existe";
 
       if (!description) next.description = "La descripción es requerida";
-      else if (description.length > 120) next.description = "Máximo 120 caracteres";
+      else if (description.length > 120)
+        next.description = "Máximo 120 caracteres";
 
-      if (!ACCOUNT_TYPES.includes(values.type)) next.type = "Tipo inválido";
+      if (!percentageStr) next.percentage = "El porcentaje es requerido";
+      else {
+        const num = Number(percentageStr);
+        if (Number.isNaN(num)) next.percentage = "Debe ser un número";
+        else if (num < 0) next.percentage = "No puede ser negativo";
+        else if (num > 100) next.percentage = "Máximo 100";
+      }
 
-      if (!currency) next.currency = "La moneda es requerida";
-      else if (!/^[A-Z]{3}$/.test(currency))
-        next.currency = "Usa el código ISO de 3 letras (ej. MXN, USD)";
+      if (!TAX_INDICATOR_TYPES.includes(values.type)) next.type = "Tipo inválido";
 
       return next;
     },
@@ -258,12 +242,8 @@ export default function AccountingAccountAdmin({
 
   const handleSubmit = async () => {
     const editingId =
-      dialog.kind === "edit" ? dialog.account.accounting_account_id : undefined;
-    const normalized: AccountingAccountFormValues = {
-      ...form,
-      currency: form.currency.trim().toUpperCase(),
-    };
-    const nextErrors = validate(normalized, editingId);
+      dialog.kind === "edit" ? dialog.indicator.tax_indicator_id : undefined;
+    const nextErrors = validate(form, editingId);
     setErrors(nextErrors);
     if (Object.keys(nextErrors).length > 0) return;
 
@@ -271,50 +251,50 @@ export default function AccountingAccountAdmin({
     try {
       if (dialog.kind === "create") {
         const payload = {
-          account_number: normalized.account_number.trim(),
-          description: normalized.description.trim(),
-          type: normalized.type,
-          currency: normalized.currency,
+          key: form.key.trim(),
+          description: form.description.trim(),
+          percentage: Number(form.percentage),
+          type: form.type,
         };
-        let created: AccountingAccount | null = null;
+        let created: TaxIndicator | null = null;
         if (apiEndpoint) {
           try {
-            created = await apiRequest<AccountingAccount>(apiEndpoint, {
+            created = await apiRequest<TaxIndicator>(apiEndpoint, {
               method: "POST",
               data: payload,
               headers: token ? { Authorization: `Bearer ${token}` } : undefined,
             });
           } catch (err) {
             console.warn(
-              "[AccountingAccountAdmin] create failed, using local state",
+              "[TaxIndicatorAdmin] create failed, using local state",
               err
             );
           }
         }
         const nextId =
-          created?.accounting_account_id ??
-          items.reduce((m, i) => Math.max(m, i.accounting_account_id), 0) + 1;
+          created?.tax_indicator_id ??
+          items.reduce((m, i) => Math.max(m, i.tax_indicator_id), 0) + 1;
         const orgId = created?.org_id ?? items[0]?.org_id ?? 1;
         setItems((prev) => [
           ...prev,
           created ?? {
-            accounting_account_id: nextId,
+            tax_indicator_id: nextId,
             org_id: orgId,
             ...payload,
           },
         ]);
-        setToast({ message: "Cuenta contable creada", type: "success" });
+        setToast({ message: "Indicador creado", type: "success" });
       } else if (dialog.kind === "edit") {
         const payload = {
-          account_number: normalized.account_number.trim(),
-          description: normalized.description.trim(),
-          type: normalized.type,
-          currency: normalized.currency,
+          key: form.key.trim(),
+          description: form.description.trim(),
+          percentage: Number(form.percentage),
+          type: form.type,
         };
         if (apiEndpoint) {
           try {
             await apiRequest(
-              `${apiEndpoint}/${dialog.account.accounting_account_id}`,
+              `${apiEndpoint}/${dialog.indicator.tax_indicator_id}`,
               {
                 method: "PUT",
                 data: payload,
@@ -325,19 +305,19 @@ export default function AccountingAccountAdmin({
             );
           } catch (err) {
             console.warn(
-              "[AccountingAccountAdmin] update failed, using local state",
+              "[TaxIndicatorAdmin] update failed, using local state",
               err
             );
           }
         }
         setItems((prev) =>
           prev.map((i) =>
-            i.accounting_account_id === dialog.account.accounting_account_id
+            i.tax_indicator_id === dialog.indicator.tax_indicator_id
               ? { ...i, ...payload }
               : i
           )
         );
-        setToast({ message: "Cuenta contable actualizada", type: "success" });
+        setToast({ message: "Indicador actualizado", type: "success" });
       }
       closeDialog();
     } catch (err) {
@@ -349,12 +329,12 @@ export default function AccountingAccountAdmin({
 
   const handleDelete = async () => {
     if (dialog.kind !== "delete") return;
-    const id = dialog.account.accounting_account_id;
+    const id = dialog.indicator.tax_indicator_id;
 
     if (mappedIds.has(id)) {
       setToast({
         message:
-          "No se puede eliminar: la cuenta está asociada a un tipo de gasto activo.",
+          "No se puede eliminar: el indicador está asociado a un tipo de gasto activo.",
         type: "error",
       });
       closeDialog();
@@ -371,13 +351,13 @@ export default function AccountingAccountAdmin({
         });
       } catch (err) {
         console.warn(
-          "[AccountingAccountAdmin] delete failed, using local state",
+          "[TaxIndicatorAdmin] delete failed, using local state",
           err
         );
       }
     }
-    setItems((prev) => prev.filter((i) => i.accounting_account_id !== id));
-    setToast({ message: "Cuenta contable eliminada", type: "success" });
+    setItems((prev) => prev.filter((i) => i.tax_indicator_id !== id));
+    setToast({ message: "Indicador eliminado", type: "success" });
     closeDialog();
   };
 
@@ -386,24 +366,24 @@ export default function AccountingAccountAdmin({
     try {
       await downloadCsvWithBackend({
         apiEndpoint: exportEndpoint,
-        entity: "accounting-accounts",
+        entity: "tax-indicators",
         token,
-        filename: `cuentas-contables-${new Date()
+        filename: `indicadores-impuesto-${new Date()
           .toISOString()
           .slice(0, 10)}.csv`,
         columns: [
-          { key: "account_number", header: "Número" },
+          { key: "key", header: "Clave" },
           { key: "description", header: "Descripción" },
+          { key: "percentage", header: "Porcentaje" },
           { key: "type", header: "Tipo" },
-          { key: "currency", header: "Moneda" },
           { key: "in_use", header: "En uso" },
         ],
-        fallbackRows: sortedItems.map((account) => ({
-          account_number: account.account_number,
-          description: account.description,
-          type: ACCOUNT_TYPE_LABEL[account.type],
-          currency: account.currency,
-          in_use: mappedIds.has(account.accounting_account_id) ? "Sí" : "No",
+        fallbackRows: sortedItems.map((indicator) => ({
+          key: indicator.key,
+          description: indicator.description,
+          percentage: indicator.percentage,
+          type: TAX_INDICATOR_TYPE_LABEL[indicator.type],
+          in_use: mappedIds.has(indicator.tax_indicator_id) ? "Sí" : "No",
         })),
       });
       setToast({ message: "CSV descargado", type: "success" });
@@ -417,23 +397,23 @@ export default function AccountingAccountAdmin({
 
   const dialogOpen = dialog.kind !== "closed";
   const isFormDialog = dialog.kind === "create" || dialog.kind === "edit";
-  const deletingAccount = dialog.kind === "delete" ? dialog.account : null;
+  const deletingIndicator = dialog.kind === "delete" ? dialog.indicator : null;
   const deletingIsMapped =
-    !!deletingAccount && mappedIds.has(deletingAccount.accounting_account_id);
+    !!deletingIndicator && mappedIds.has(deletingIndicator.tax_indicator_id);
 
   const dialogTitle =
     dialog.kind === "create"
-      ? "Nueva cuenta contable"
+      ? "Nuevo indicador de impuesto"
       : dialog.kind === "edit"
-        ? `Editar cuenta: ${dialog.account.account_number}`
+        ? `Editar indicador: ${dialog.indicator.key}`
         : dialog.kind === "delete"
-          ? "Eliminar cuenta contable"
+          ? "Eliminar indicador"
           : "";
 
-  const deleteMessage = deletingAccount
+  const deleteMessage = deletingIndicator
     ? deletingIsMapped
-      ? `No se puede eliminar "${deletingAccount.account_number} · ${deletingAccount.description}" porque está asociada a un tipo de gasto activo. Quita el mapeo primero.`
-      : `¿Confirmas eliminar "${deletingAccount.account_number} · ${deletingAccount.description}"? Esta acción no se puede deshacer.`
+      ? `No se puede eliminar "${deletingIndicator.key} · ${deletingIndicator.description}" porque está asociado a un tipo de gasto activo. Quita el mapeo primero.`
+      : `¿Confirmas eliminar "${deletingIndicator.key} · ${deletingIndicator.description}"? Esta acción no se puede deshacer.`
     : "";
 
   return (
@@ -441,8 +421,10 @@ export default function AccountingAccountAdmin({
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
         <p className="text-sm text-[var(--color-ink-muted)]">
           {sortedItems.length}{" "}
-          {sortedItems.length === 1 ? "cuenta registrada" : "cuentas registradas"} ·{" "}
-          {mappedIds.size} en uso
+          {sortedItems.length === 1
+            ? "indicador registrado"
+            : "indicadores registrados"}{" "}
+          · {mappedIds.size} en uso
         </p>
         <div className="flex items-center gap-2">
           <Button
@@ -460,7 +442,7 @@ export default function AccountingAccountAdmin({
             color="primary"
             onClick={openCreate}
           >
-            + Nueva cuenta
+            + Nuevo indicador
           </Button>
         </div>
       </div>
@@ -470,13 +452,13 @@ export default function AccountingAccountAdmin({
           <table className="min-w-full">
             <thead>
               <tr className="border-b border-[var(--color-neutral-200)]">
-                <th className="px-6 py-3 text-left eyebrow">Número</th>
+                <th className="px-6 py-3 text-left eyebrow">Clave</th>
                 <th className="px-6 py-3 text-left eyebrow">Descripción</th>
-                <th className="px-6 py-3 text-left eyebrow hidden sm:table-cell">
-                  Tipo
+                <th className="px-6 py-3 text-right eyebrow hidden sm:table-cell">
+                  Porcentaje
                 </th>
                 <th className="px-6 py-3 text-left eyebrow hidden md:table-cell">
-                  Moneda
+                  Tipo
                 </th>
                 <th className="px-6 py-3 text-left eyebrow hidden lg:table-cell">
                   Estado
@@ -491,35 +473,38 @@ export default function AccountingAccountAdmin({
                     colSpan={6}
                     className="px-6 py-10 text-center text-sm text-[var(--color-ink-muted)]"
                   >
-                    No hay cuentas contables registradas.
+                    No hay indicadores de impuesto registrados.
                   </td>
                 </tr>
               ) : (
-                sortedItems.map((account, idx) => {
+                sortedItems.map((indicator, idx) => {
                   const isLast = idx === sortedItems.length - 1;
-                  const inUse = mappedIds.has(account.accounting_account_id);
+                  const inUse = mappedIds.has(indicator.tax_indicator_id);
                   return (
                     <tr
-                      key={account.accounting_account_id}
+                      key={indicator.tax_indicator_id}
                       className={`${
                         !isLast
                           ? "border-b border-[var(--color-neutral-200)]"
                           : ""
                       } hover:bg-[var(--color-surface-secondary)] transition-colors`}
                     >
-                      <td className="px-6 py-4 text-sm tabular-nums text-[var(--color-ink)] font-medium">
-                        {account.account_number}
+                      <td className="px-6 py-4 text-sm font-medium text-[var(--color-ink)]">
+                        {indicator.key}
                       </td>
                       <td className="px-6 py-4 text-sm text-[var(--color-ink)]">
-                        {account.description}
+                        {indicator.description}
                       </td>
-                      <td className="px-6 py-4 hidden sm:table-cell">
+                      <td className="px-6 py-4 text-sm tabular-nums text-right hidden sm:table-cell text-[var(--color-ink)]">
+                        {indicator.percentage.toLocaleString("es-MX", {
+                          maximumFractionDigits: 3,
+                        })}
+                        %
+                      </td>
+                      <td className="px-6 py-4 hidden md:table-cell">
                         <span className="status-pill bg-[var(--color-surface-secondary)] text-[var(--color-ink-secondary)]">
-                          {ACCOUNT_TYPE_LABEL[account.type]}
+                          {TAX_INDICATOR_TYPE_LABEL[indicator.type]}
                         </span>
-                      </td>
-                      <td className="px-6 py-4 text-sm tabular-nums text-[var(--color-ink-secondary)] hidden md:table-cell">
-                        {account.currency}
                       </td>
                       <td className="px-6 py-4 hidden lg:table-cell">
                         {inUse ? (
@@ -536,7 +521,7 @@ export default function AccountingAccountAdmin({
                         <div className="flex items-center justify-end gap-3">
                           <button
                             type="button"
-                            onClick={() => openEdit(account)}
+                            onClick={() => openEdit(indicator)}
                             className="text-sm text-primary-500 hover:text-primary-400 transition-colors font-medium cursor-pointer"
                           >
                             Editar
@@ -544,12 +529,12 @@ export default function AccountingAccountAdmin({
                           <button
                             type="button"
                             onClick={() =>
-                              setDialog({ kind: "delete", account })
+                              setDialog({ kind: "delete", indicator })
                             }
                             disabled={inUse}
                             title={
                               inUse
-                                ? "La cuenta está asociada a un tipo de gasto activo"
+                                ? "El indicador está asociado a un tipo de gasto activo"
                                 : undefined
                             }
                             className={`text-sm font-medium transition-colors ${
@@ -601,26 +586,24 @@ export default function AccountingAccountAdmin({
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium mb-1.5 text-[var(--color-ink-secondary)]">
-                Número de cuenta <span className="text-accent-400">*</span>
+                Clave <span className="text-accent-400">*</span>
               </label>
               <input
                 type="text"
-                value={form.account_number}
+                value={form.key}
                 onChange={(e) =>
-                  setForm((f) => ({ ...f, account_number: e.target.value }))
+                  setForm((f) => ({ ...f, key: e.target.value }))
                 }
-                className={`w-full border rounded-[var(--radius-md)] px-3 py-2.5 text-sm bg-[var(--color-surface-white)] text-[var(--color-ink)] focus:outline-none focus:ring-2 focus:ring-primary-200 focus:border-primary-400 transition-colors tabular-nums ${
-                  errors.account_number
+                className={`w-full border rounded-[var(--radius-md)] px-3 py-2.5 text-sm bg-[var(--color-surface-white)] text-[var(--color-ink)] focus:outline-none focus:ring-2 focus:ring-primary-200 focus:border-primary-400 transition-colors ${
+                  errors.key
                     ? "border-accent-400"
                     : "border-[var(--color-neutral-300)]"
                 }`}
-                placeholder="6100-001"
+                placeholder="IVA16"
                 autoFocus
               />
-              {errors.account_number && (
-                <p className="text-accent-400 text-xs mt-1">
-                  {errors.account_number}
-                </p>
+              {errors.key && (
+                <p className="text-accent-400 text-xs mt-1">{errors.key}</p>
               )}
             </div>
 
@@ -639,7 +622,7 @@ export default function AccountingAccountAdmin({
                     ? "border-accent-400"
                     : "border-[var(--color-neutral-300)]"
                 }`}
-                placeholder="Gastos de viaje · Avión"
+                placeholder="IVA 16% acreditable"
               />
               {errors.description && (
                 <p className="text-accent-400 text-xs mt-1">{errors.description}</p>
@@ -649,6 +632,36 @@ export default function AccountingAccountAdmin({
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <div>
                 <label className="block text-sm font-medium mb-1.5 text-[var(--color-ink-secondary)]">
+                  Porcentaje <span className="text-accent-400">*</span>
+                </label>
+                <div className="relative">
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    step="0.01"
+                    value={form.percentage}
+                    onChange={(e) =>
+                      setForm((f) => ({ ...f, percentage: e.target.value }))
+                    }
+                    className={`w-full border rounded-[var(--radius-md)] pl-3 pr-9 py-2.5 text-sm bg-[var(--color-surface-white)] text-[var(--color-ink)] focus:outline-none focus:ring-2 focus:ring-primary-200 focus:border-primary-400 transition-colors tabular-nums ${
+                      errors.percentage
+                        ? "border-accent-400"
+                        : "border-[var(--color-neutral-300)]"
+                    }`}
+                    placeholder="16"
+                  />
+                  <span className="absolute right-3 top-1/2 -translate-y-1/2 text-sm text-[var(--color-ink-muted)] pointer-events-none">
+                    %
+                  </span>
+                </div>
+                {errors.percentage && (
+                  <p className="text-accent-400 text-xs mt-1">{errors.percentage}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1.5 text-[var(--color-ink-secondary)]">
                   Tipo <span className="text-accent-400">*</span>
                 </label>
                 <select
@@ -656,7 +669,7 @@ export default function AccountingAccountAdmin({
                   onChange={(e) =>
                     setForm((f) => ({
                       ...f,
-                      type: e.target.value as AccountingAccountType,
+                      type: e.target.value as TaxIndicatorType,
                     }))
                   }
                   className={`w-full border rounded-[var(--radius-md)] px-3 py-2.5 text-sm bg-[var(--color-surface-white)] text-[var(--color-ink)] focus:outline-none focus:ring-2 focus:ring-primary-200 focus:border-primary-400 transition-colors ${
@@ -665,46 +678,14 @@ export default function AccountingAccountAdmin({
                       : "border-[var(--color-neutral-300)]"
                   }`}
                 >
-                  {ACCOUNT_TYPES.map((t) => (
+                  {TAX_INDICATOR_TYPES.map((t) => (
                     <option key={t} value={t}>
-                      {ACCOUNT_TYPE_LABEL[t]}
+                      {TAX_INDICATOR_TYPE_LABEL[t]}
                     </option>
                   ))}
                 </select>
                 {errors.type && (
                   <p className="text-accent-400 text-xs mt-1">{errors.type}</p>
-                )}
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium mb-1.5 text-[var(--color-ink-secondary)]">
-                  Moneda <span className="text-accent-400">*</span>
-                </label>
-                <input
-                  type="text"
-                  list="aa-currency-options"
-                  value={form.currency}
-                  onChange={(e) =>
-                    setForm((f) => ({
-                      ...f,
-                      currency: e.target.value.toUpperCase().slice(0, 3),
-                    }))
-                  }
-                  className={`w-full border rounded-[var(--radius-md)] px-3 py-2.5 text-sm bg-[var(--color-surface-white)] text-[var(--color-ink)] focus:outline-none focus:ring-2 focus:ring-primary-200 focus:border-primary-400 transition-colors uppercase ${
-                    errors.currency
-                      ? "border-accent-400"
-                      : "border-[var(--color-neutral-300)]"
-                  }`}
-                  placeholder="MXN"
-                  maxLength={3}
-                />
-                <datalist id="aa-currency-options">
-                  {currencyOptions.map((c) => (
-                    <option key={c} value={c} />
-                  ))}
-                </datalist>
-                {errors.currency && (
-                  <p className="text-accent-400 text-xs mt-1">{errors.currency}</p>
                 )}
               </div>
             </div>
