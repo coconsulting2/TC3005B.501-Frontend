@@ -1,0 +1,30 @@
+---
+/**
+ * /admin/indicadores-impuesto — CRUD de indicadores de impuesto del
+ * catálogo por organización (M3-008). Integración con API real al liberar
+ * /admin/tax-indicators en backend.
+ */
+
+import EditorialHeader from "@components/EditorialHeader.astro";
+import MainLayout from "@layouts/MainLayout.astro";
+import TaxIndicatorAdmin from "@components/TaxIndicatorAdmin";
+import { getCookie } from "@data/cookies";
+import { roleLabels } from "@config/role-labels";
+import type { UserRole } from "@type/roles";
+
+const role: UserRole = getCookie("role", Astro.cookies) as UserRole;
+const buttonLabel = roleLabels[role];
+const userName = getCookie("username", Astro.cookies);
+const token = getCookie("token", Astro.cookies);
+---
+
+<MainLayout title="Indicadores de impuesto" data={{ userName, buttonLabel, role }}>
+  <div>
+    <EditorialHeader
+      eyebrow="Coco / Administración / Indicadores de impuesto"
+      title="Indicadores de impuesto"
+      subtitle="Registra los IVA trasladados, retenidos e ISR retenidos aplicables a los gastos."
+    />
+    <TaxIndicatorAdmin client:only="react" token={token} />
+  </div>
+</MainLayout>
