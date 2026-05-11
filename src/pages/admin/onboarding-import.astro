@@ -1,0 +1,28 @@
+---
+/**
+ * /admin/onboarding-import — importación masiva de usuarios (JSON / CSV).
+ * Gated por permiso onboarding:import. Solo visible para DittaSuperAdmin y OrgAdmin con ese permiso.
+ */
+
+import EditorialHeader from "@components/EditorialHeader.astro";
+import MainLayout from "@layouts/MainLayout.astro";
+import OnboardingImportAdmin from "@views/admin/OnboardingImportAdmin";
+import { getCookie } from "@data/cookies";
+import { roleLabels } from "@config/role-labels";
+import type { UserRole } from "@type/roles";
+
+const role: UserRole = getCookie("role", Astro.cookies) as UserRole;
+const buttonLabel = roleLabels[role];
+const userName = getCookie("username", Astro.cookies);
+---
+
+<MainLayout title="Importación de Usuarios" data={{ userName, buttonLabel, role }}>
+  <div>
+    <EditorialHeader
+      eyebrow="Coco / Administración / Importación"
+      title="Importar Usuarios"
+      subtitle="Carga masiva de usuarios desde un archivo JSON o CSV. El sistema detecta el formato automáticamente y muestra una vista previa antes de persistir."
+    />
+    <OnboardingImportAdmin client:only="react" />
+  </div>
+</MainLayout>
