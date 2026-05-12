@@ -6,6 +6,7 @@
  * FormData con el archivo y maneja CSRF + sesión de la misma forma.
  */
 import { getSession } from "@data/cookies";
+import { getImpersonatedOrgId } from "@stores/organizationStore";
 import type {
   PreviewImportResponse,
   ApplyImportResponse,
@@ -25,6 +26,8 @@ export type ApplyImportOptions = {
   passwordGlobal?: string;
   /** userName → contraseña individual; tiene prioridad sobre global y archivo. */
   passwordOverrides?: Record<string, string>;
+  /** Debe coincidir con la vista previa generada con `create_new_org=1`. */
+  createNewOrganization?: boolean;
 };
 
 function resolveApiBase(): string {
@@ -32,6 +35,19 @@ function resolveApiBase(): string {
     (typeof import.meta !== "undefined" && (import.meta.env?.PUBLIC_API_BASE_URL as string)) ||
     DEFAULT_API
   ).replace(/\/$/, "");
+}
+
+/**
+ * Org destino para header `X-Organization-Id` (misma regla que `apiRequest`):
+ * argumento explícito gana; si no, la org impersonada del layout (super-admin Ditta).
+ */
+function resolveImportTargetOrgId(explicitOrgId?: string): string | null {
+  const trimmed = explicitOrgId?.trim();
+  if (trimmed) return trimmed;
+  if (typeof window !== "undefined") {
+    return getImpersonatedOrgId();
+  }
+  return null;
 }
 
 async function getCsrfToken(): Promise<string> {
@@ -49,11 +65,13 @@ async function getCsrfToken(): Promise<string> {
  * Envía el archivo al endpoint de preview y devuelve el resultado.
  *
  * @param file           - Objeto File del input/drag-drop.
- * @param orgId          - ID de la org destino (para impersonación Ditta).
+ * @param orgId          - ID de la org destino (opcional). Si se omite, se usa la org
+ *                         impersonada del selector principal (`getImpersonatedOrgId`), igual que el resto de la API.
  */
 export async function uploadImportPreview(
   file: File,
-  orgId?: string
+  orgId?: string,
+  opts?: { createNewOrganization?: boolean }
 ): Promise<PreviewImportResponse> {
   const base     = resolveApiBase();
   const session  = getSession();
@@ -68,11 +86,16 @@ export async function uploadImportPreview(
   if (session?.token) {
     headers["Authorization"] = `Bearer ${session.token}`;
   }
-  if (orgId) {
-    headers["X-Organization-Id"] = orgId;
+  const targetOrgId = opts?.createNewOrganization ? null : resolveImportTargetOrgId(orgId);
+  if (targetOrgId) {
+    headers["X-Organization-Id"] = targetOrgId;
   }
 
-  const res = await fetch(`${base}/onboarding/import/preview`, {
+  const previewPath = `/onboarding/import/preview${
+    opts?.createNewOrganization ? "?create_new_org=1" : ""
+  }`;
+
+  const res = await fetch(`${base}${previewPath}`, {
     method: "POST",
     credentials: "include",
     headers,
@@ -86,6 +109,8 @@ export async function uploadImportPreview(
 
 /**
  * Confirma la importación usando el previewToken obtenido en uploadImportPreview.
+ *
+ * @param orgId - Opcional; si se omite, misma resolución que `uploadImportPreview` (impersonación del layout).
  */
 export async function applyImportPreview(
   previewToken: string,
@@ -103,8 +128,9 @@ export async function applyImportPreview(
   if (session?.token) {
     headers["Authorization"] = `Bearer ${session.token}`;
   }
-  if (orgId) {
-    headers["X-Organization-Id"] = orgId;
+  const targetOrgId = opts?.createNewOrganization ? null : resolveImportTargetOrgId(orgId);
+  if (targetOrgId) {
+    headers["X-Organization-Id"] = targetOrgId;
   }
 
   const body: Record<string, unknown> = { previewToken };
@@ -130,6 +156,9 @@ export async function applyImportPreview(
       if (v.trim()) filtered[k] = v.trim();
     }
     if (Object.keys(filtered).length > 0) body.passwordOverrides = filtered;
+  }
+  if (opts?.createNewOrganization) {
+    body.createNewOrganization = true;
   }
 
   const res = await fetch(`${base}/onboarding/import/apply`, {

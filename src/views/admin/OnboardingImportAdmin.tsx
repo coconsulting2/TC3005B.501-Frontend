@@ -17,6 +17,11 @@ import type {
   ImportUserPreview,
 } from "@type/onboardingImport";
 import { getPermissionFriendlyLabel } from "@utils/permissionLabels";
+import {
+  getImpersonatedOrgId,
+  IMPERSONATED_ORG_CHANGE_EVENT,
+  IMPERSONATED_ORG_ID_STORAGE_KEY,
+} from "@stores/organizationStore";
 
 /** Misma regla que el backend (importación). */
 const ONBOARDING_PASSWORD_RE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
@@ -51,7 +56,10 @@ const T = {
 } as const;
 
 interface Props {
-  /** Org destino para super-admin Ditta que usa impersonación. */
+  /**
+   * Org destino explícita (poco habitual). Si no se pasa, `uploadImportPreview` / `applyImportPreview`
+   * usan la org impersonada del selector principal (`getImpersonatedOrgId`), alineado con `apiRequest`.
+   */
   orgId?: string;
 }
 
@@ -75,6 +83,29 @@ export default function OnboardingImportAdmin({ orgId }: Props) {
   /** userName → rol elegido en la UI (sobrescribe el del archivo y los mappings). */
   const [roleOverridesByUser, setRoleOverridesByUser] = useState<Record<string, string>>({});
   const [previewApplyError, setPreviewApplyError] = useState("");
+  /** Vista previa con `?create_new_org=1` (solo JSON con bloque organization + permiso crear org). */
+  const [createNewOrgOption, setCreateNewOrgOption] = useState(false);
+
+  /** Snapshot reactivo de impersonación (localStorage + evento al cambiar en la misma pestaña). */
+  const [impersonatedOrgId, setImpersonatedOrgSnapshot] = useState<string | null>(null);
+
+  useEffect(() => {
+    const sync = () => {
+      const id = getImpersonatedOrgId();
+      setImpersonatedOrgSnapshot(id);
+      if (id) setCreateNewOrgOption((prev) => (prev ? false : prev));
+    };
+    sync();
+    window.addEventListener(IMPERSONATED_ORG_CHANGE_EVENT, sync);
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === IMPERSONATED_ORG_ID_STORAGE_KEY) sync();
+    };
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener(IMPERSONATED_ORG_CHANGE_EVENT, sync);
+      window.removeEventListener("storage", onStorage);
+    };
+  }, []);
 
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -90,10 +121,35 @@ export default function OnboardingImportAdmin({ orgId }: Props) {
     setPasswordOverridesByUser({});
     setRoleOverridesByUser({});
     setPreviewApplyError("");
+    setCreateNewOrgOption(false);
   }, [preview?.previewToken]);
 
   const handleFile = useCallback(
     async (file: File) => {
+      const impNow = getImpersonatedOrgId();
+      const lower = file.name.toLowerCase();
+      const isJsonFile =
+        lower.endsWith(".json") ||
+        file.type === "application/json" ||
+        file.type === "text/json";
+
+      if (createNewOrgOption && impNow) {
+        setFileName(file.name);
+        setErrorMsg(
+          "No puedes crear una organización nueva mientras impersonas otra. Sal de la impersonación e inténtalo de nuevo."
+        );
+        setPhase("error");
+        return;
+      }
+      if (createNewOrgOption && !isJsonFile) {
+        setFileName(file.name);
+        setErrorMsg(
+          "La opción «Crear organización nueva» solo aplica a archivos JSON (bloque organization + usuarios). Elige un archivo .json o desmarca la opción."
+        );
+        setPhase("error");
+        return;
+      }
+
       setFileName(file.name);
       setPhase("loading");
       setErrorMsg("");
@@ -101,7 +157,9 @@ export default function OnboardingImportAdmin({ orgId }: Props) {
       setPreview(null);
       setResult(null);
       try {
-        const res = await uploadImportPreview(file, orgId);
+        const res = await uploadImportPreview(file, orgId, {
+          createNewOrganization: Boolean(createNewOrgOption && !getImpersonatedOrgId()),
+        });
         setPreview(res);
         setPhase("preview");
       } catch (e: unknown) {
@@ -109,7 +167,7 @@ export default function OnboardingImportAdmin({ orgId }: Props) {
         setPhase("error");
       }
     },
-    [orgId]
+    [orgId, createNewOrgOption]
   );
 
   const handleDrop = useCallback(
@@ -203,6 +261,7 @@ export default function OnboardingImportAdmin({ orgId }: Props) {
           Object.keys(extrasPayload).length > 0 ? extrasPayload : undefined,
         passwordGlobal: g || undefined,
         passwordOverrides: Object.keys(pwdOverrides).length > 0 ? pwdOverrides : undefined,
+        createNewOrganization: Boolean(preview.previewCreateNewOrganization),
       });
       setResult(res);
       setPhase("done");
@@ -224,6 +283,7 @@ export default function OnboardingImportAdmin({ orgId }: Props) {
     setPasswordOverridesByUser({});
     setRoleOverridesByUser({});
     setPreviewApplyError("");
+    setCreateNewOrgOption(false);
   };
 
   return (
@@ -231,6 +291,35 @@ export default function OnboardingImportAdmin({ orgId }: Props) {
 
       {/* ── Zona de drop ── */}
       {(phase === "idle" || phase === "error") && (
+        <>
+          <div
+            style={{
+              marginBottom: 16,
+              padding: "12px 14px",
+              borderRadius: 8,
+              border: `1px solid ${T.borderSoft}`,
+              background: T.surfaceMuted,
+              fontSize: 13,
+              color: T.inkSecondary,
+            }}
+          >
+            <label style={{ display: "flex", gap: 10, alignItems: "flex-start", cursor: impersonatedOrgId ? "not-allowed" : "pointer" }}>
+              <input
+                type="checkbox"
+                checked={createNewOrgOption}
+                disabled={Boolean(impersonatedOrgId)}
+                onChange={(e) => setCreateNewOrgOption(e.target.checked)}
+                style={{ marginTop: 2 }}
+              />
+              <span>
+                <strong>Crear organización nueva</strong> al importar (solo JSON con bloque{" "}
+                <code style={{ fontSize: 12 }}>organization</code> + usuarios). Requiere permiso de crear organizaciones.
+                {impersonatedOrgId ? (
+                  <> Sal de la <strong>impersonación</strong> de otra org antes de marcar esta opción.</>
+                ) : null}
+              </span>
+            </label>
+          </div>
         <div
           onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
           onDragLeave={() => setDragging(false)}
@@ -259,11 +348,12 @@ export default function OnboardingImportAdmin({ orgId }: Props) {
           <input
             ref={inputRef}
             type="file"
-            accept=".json,.csv,.txt"
+            accept={createNewOrgOption ? ".json,application/json" : ".json,.csv,.txt"}
             onChange={handleInputChange}
             style={{ display: "none" }}
           />
         </div>
+        </>
       )}
 
       {/* ── Cargando ── */}
@@ -496,6 +586,13 @@ function PreviewPanel({
             Cerrar
           </button>
         </div>
+      ) : null}
+      {preview.organizationFromFile ? (
+        <StatusBanner color={T.primary}>
+          {preview.previewCreateNewOrganization
+            ? `Se creará la organización «${preview.organizationFromFile.nombre}» y después se importarán los usuarios en esa org.`
+            : `El archivo describe la organización «${preview.organizationFromFile.nombre}»; los usuarios se crearán en la org destino actual (no se crea org nueva).`}
+        </StatusBanner>
       ) : null}
       {/* Resumen */}
       <div
@@ -874,6 +971,12 @@ function DonePanel({
         ✓ Importación completada: <strong>{result.created}</strong> usuario
         {result.created !== 1 ? "s" : ""} creados
         {result.skipped > 0 ? `, ${result.skipped} omitidos` : ""}.
+        {result.createdOrganization ? (
+          <span style={{ display: "block", marginTop: 8, fontSize: 14 }}>
+            Organización nueva: <strong>{result.createdOrganization.nombre}</strong> (id{" "}
+            <code style={{ fontSize: 12 }}>{result.createdOrganization.id}</code>). Puedes activarla desde el panel de organizaciones.
+          </span>
+        ) : null}
       </StatusBanner>
       {result.failures && result.failures.length > 0 && (
         <div
