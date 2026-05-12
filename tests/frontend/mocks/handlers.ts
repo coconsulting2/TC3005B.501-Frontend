@@ -30,7 +30,33 @@ export const handlers = [
       fecha_emision: "2026-04-10T12:00",
       monto_total: 1250.5,
       uuid: "A1B2C3D4-E5F6-7890-1234-567890ABCDEF",
+      registro_sugerido: {
+        uuid: "A1B2C3D4-E5F6-7890-1234-567890ABCDEF",
+        fecha_timbrado: "2026-04-10T12:00:00.000Z",
+        rfc_pac: "XEXX010101000",
+        fecha_emision: "2026-04-10T12:00:00.000Z",
+        tipo_comprobante: "I",
+        lugar_expedicion: "01000",
+        metodo_pago: "PUE",
+        forma_pago: "03",
+        moneda: "MXN",
+        subtotal: 1250.5,
+        total: 1250.5,
+        rfc_emisor: "EKU9003173C9",
+        nombre_emisor: "Emisor Test",
+        regimen_fiscal_emisor: "601",
+        rfc_receptor: "XAXX010101000",
+        nombre_receptor: "Receptor Test",
+        domicilio_fiscal_receptor: "01000",
+        regimen_fiscal_receptor: "601",
+        uso_cfdi: "G03",
+        version: "4.0",
+      },
     });
+  }),
+
+  http.post(`${API}/comprobantes/:id`, () => {
+    return HttpResponse.json({ ok: true, cfdiId: 1 });
   }),
 
   http.post(`${API}/comprobantes/:id/registrar`, () => {
@@ -47,6 +73,13 @@ export const handlers = [
 
   http.post(`${API}/files/upload-receipt-files/:id`, () => {
     return HttpResponse.json({ ok: true });
+  }),
+
+  http.get(`${API}/fx/convert`, () => {
+    return HttpResponse.json({
+      success: true,
+      data: { converted: 1000, rate: 20, from: "USD", to: "MXN", amount: 50 },
+    });
   }),
 
   http.delete(`${API}/applicant/delete-receipt/:id`, () => {
