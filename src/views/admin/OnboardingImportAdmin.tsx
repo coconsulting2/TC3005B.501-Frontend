@@ -17,7 +17,11 @@ import type {
   ImportUserPreview,
 } from "@type/onboardingImport";
 import { getPermissionFriendlyLabel } from "@utils/permissionLabels";
-import { getImpersonatedOrgId } from "@stores/organizationStore";
+import {
+  getImpersonatedOrgId,
+  IMPERSONATED_ORG_CHANGE_EVENT,
+  IMPERSONATED_ORG_ID_STORAGE_KEY,
+} from "@stores/organizationStore";
 
 /** Misma regla que el backend (importación). */
 const ONBOARDING_PASSWORD_RE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
@@ -82,6 +86,27 @@ export default function OnboardingImportAdmin({ orgId }: Props) {
   /** Vista previa con `?create_new_org=1` (solo JSON con bloque organization + permiso crear org). */
   const [createNewOrgOption, setCreateNewOrgOption] = useState(false);
 
+  /** Snapshot reactivo de impersonación (localStorage + evento al cambiar en la misma pestaña). */
+  const [impersonatedOrgId, setImpersonatedOrgSnapshot] = useState<string | null>(null);
+
+  useEffect(() => {
+    const sync = () => {
+      const id = getImpersonatedOrgId();
+      setImpersonatedOrgSnapshot(id);
+      if (id) setCreateNewOrgOption((prev) => (prev ? false : prev));
+    };
+    sync();
+    window.addEventListener(IMPERSONATED_ORG_CHANGE_EVENT, sync);
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === IMPERSONATED_ORG_ID_STORAGE_KEY) sync();
+    };
+    window.addEventListener("storage", onStorage);
+    return () => {
+      window.removeEventListener(IMPERSONATED_ORG_CHANGE_EVENT, sync);
+      window.removeEventListener("storage", onStorage);
+    };
+  }, []);
+
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
@@ -101,6 +126,30 @@ export default function OnboardingImportAdmin({ orgId }: Props) {
 
   const handleFile = useCallback(
     async (file: File) => {
+      const impNow = getImpersonatedOrgId();
+      const lower = file.name.toLowerCase();
+      const isJsonFile =
+        lower.endsWith(".json") ||
+        file.type === "application/json" ||
+        file.type === "text/json";
+
+      if (createNewOrgOption && impNow) {
+        setFileName(file.name);
+        setErrorMsg(
+          "No puedes crear una organización nueva mientras impersonas otra. Sal de la impersonación e inténtalo de nuevo."
+        );
+        setPhase("error");
+        return;
+      }
+      if (createNewOrgOption && !isJsonFile) {
+        setFileName(file.name);
+        setErrorMsg(
+          "La opción «Crear organización nueva» solo aplica a archivos JSON (bloque organization + usuarios). Elige un archivo .json o desmarca la opción."
+        );
+        setPhase("error");
+        return;
+      }
+
       setFileName(file.name);
       setPhase("loading");
       setErrorMsg("");
@@ -109,7 +158,7 @@ export default function OnboardingImportAdmin({ orgId }: Props) {
       setResult(null);
       try {
         const res = await uploadImportPreview(file, orgId, {
-          createNewOrganization: createNewOrgOption,
+          createNewOrganization: Boolean(createNewOrgOption && !getImpersonatedOrgId()),
         });
         setPreview(res);
         setPhase("preview");
@@ -254,18 +303,18 @@ export default function OnboardingImportAdmin({ orgId }: Props) {
               color: T.inkSecondary,
             }}
           >
-            <label style={{ display: "flex", gap: 10, alignItems: "flex-start", cursor: getImpersonatedOrgId() ? "not-allowed" : "pointer" }}>
+            <label style={{ display: "flex", gap: 10, alignItems: "flex-start", cursor: impersonatedOrgId ? "not-allowed" : "pointer" }}>
               <input
                 type="checkbox"
                 checked={createNewOrgOption}
-                disabled={Boolean(getImpersonatedOrgId())}
+                disabled={Boolean(impersonatedOrgId)}
                 onChange={(e) => setCreateNewOrgOption(e.target.checked)}
                 style={{ marginTop: 2 }}
               />
               <span>
                 <strong>Crear organización nueva</strong> al importar (solo JSON con bloque{" "}
                 <code style={{ fontSize: 12 }}>organization</code> + usuarios). Requiere permiso de crear organizaciones.
-                {getImpersonatedOrgId() ? (
+                {impersonatedOrgId ? (
                   <> Sal de la <strong>impersonación</strong> de otra org antes de marcar esta opción.</>
                 ) : null}
               </span>
@@ -299,7 +348,7 @@ export default function OnboardingImportAdmin({ orgId }: Props) {
           <input
             ref={inputRef}
             type="file"
-            accept=".json,.csv,.txt"
+            accept={createNewOrgOption ? ".json,application/json" : ".json,.csv,.txt"}
             onChange={handleInputChange}
             style={{ display: "none" }}
           />
@@ -809,7 +858,7 @@ function PreviewPanel({
                           autoComplete="new-password"
                           value={passwordOverridesByUser[u.userName] ?? ""}
                           onChange={(e) => onPasswordOverrideChange(u.userName, e.target.value)}
-                          placeholder="Vacío: archivo o global"
+                          placeholder="Vacío: usar global"
                           style={{
                             width: "100%",
                             minWidth: 140,
