@@ -22,6 +22,8 @@ interface User {
   email: string;
   role_name: string;
   department_name: string;
+  organization_id?: string;
+  organization_name?: string;
   active?: boolean;
 }
 
@@ -33,6 +35,18 @@ const users = await (async () => {
     errorMessage = "Error al cargar los usuarios. Inténtalo de nuevo.";
     return [];
   }
+})();
+
+const userGroups: { orgLabel: string; users: User[] }[] = (() => {
+  const m = new Map<string, User[]>();
+  for (const u of users as User[]) {
+    const key = (u.organization_name ?? "").trim() || "Sin organización";
+    if (!m.has(key)) m.set(key, []);
+    m.get(key)!.push(u);
+  }
+  return Array.from(m.entries())
+    .sort((a, b) => a[0].localeCompare(b[0], "es", { sensitivity: "base" }))
+    .map(([orgLabel, list]) => ({ orgLabel, users: list }));
 })();
 
 const role: UserRole = getCookie("role", Astro.cookies) as UserRole;
@@ -62,7 +76,7 @@ const roleVariant: Record<string, string> = {
       <EditorialHeader
         eyebrow="Coco / Administración"
         title="Usuarios del sistema"
-        subtitle={`${users.length} usuarios registrados`}
+        subtitle={`${users.length} usuarios en ${userGroups.length} organización(es)`}
       >
         <a href="/crear-usuario">
           <Button variant="filled" color="primary" size="medium">
@@ -84,8 +98,8 @@ const roleVariant: Record<string, string> = {
           position="middle"
         />
         <MetricCard
-          label="Departamentos"
-          value={String(new Set(users.map((u: User) => u.department_name).filter(Boolean)).size)}
+          label="Organizaciones (vista)"
+          value={String(userGroups.length)}
           position="last"
         />
       </div>
@@ -105,10 +119,20 @@ const roleVariant: Record<string, string> = {
               </tr>
             </thead>
             <tbody>
-              {users.map((user: User, index: number) => {
-                const isLast = index === users.length - 1;
-                return (
-                  <tr class={`${!isLast ? 'border-b border-[var(--color-neutral-200)]' : ''} hover:bg-[var(--color-surface-secondary)] transition-colors`}>
+              {userGroups.map((group) => (
+                <>
+                  <tr class="bg-[var(--color-surface-tertiary)] border-b border-[var(--color-neutral-200)]">
+                    <td colspan={6} class="px-6 py-2 text-xs font-semibold uppercase tracking-wide text-[var(--color-ink-secondary)]">
+                      {group.orgLabel}
+                      <span class="normal-case font-normal text-[var(--color-ink-muted)]">
+                        {" "}— {group.users.length === 1 ? "1 usuario" : `${group.users.length} usuarios`}
+                      </span>
+                    </td>
+                  </tr>
+                  {group.users.map((user: User, index: number) => {
+                    const isLastInGroup = index === group.users.length - 1;
+                    return (
+                  <tr class={`${!isLastInGroup ? 'border-b border-[var(--color-neutral-200)]' : ''} hover:bg-[var(--color-surface-secondary)] transition-colors`}>
                     <td class="px-6 py-4 text-sm text-[var(--color-ink-muted)] tabular-nums">{user.user_id}</td>
                     <td class="px-6 py-4">
                       <div class="flex items-center gap-3">
@@ -126,7 +150,7 @@ const roleVariant: Record<string, string> = {
                         {user.role_name}
                       </span>
                     </td>
-                    <td class="px-6 py-4 text-sm text-[var(--color-ink-secondary)]">{user.department_name || 'Admin'}</td>
+                    <td class="px-6 py-4 text-sm text-[var(--color-ink-secondary)]">{user.department_name || '—'}</td>
                     <td class="px-6 py-4 text-center">
                       <div class="flex items-center justify-center gap-2">
                         <a href={`/editar-usuario/${user.user_id}`}>
@@ -150,8 +174,10 @@ const roleVariant: Record<string, string> = {
                       </div>
                     </td>
                   </tr>
-                );
-              })}
+                    );
+                  })}
+                </>
+              ))}
             </tbody>
           </table>
         </div>

@@ -1,10 +1,9 @@
 /**
  * Types for the expenses-by-cost-center dashboard (M3-009).
  *
- * The backend is expected to expose:
- *   GET /reports/expenses-by-cc?period=monthly|quarterly
- *      &from=YYYY-MM-DD&to=YYYY-MM-DD
- *      &expenseType=...&status=...
+ * Backend: GET /api/reports/expenses-by-cc?period=monthly|quarterly
+ *   &from=YYYY-MM-DD&to=YYYY-MM-DD&expenseType=...&status=...&costCenterId=...
+ * (el cliente usa `apiRequest("/reports/expenses-by-cc", …)` con base `/api`).
  *
  * Returning ExpenseReportResponse below (or an array of rows).
  */
