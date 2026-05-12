@@ -11,6 +11,10 @@ const routesAdministracion: string[] = [
   "/admin/refund-time-limits",
   "/admin/organizations",
   "/admin/onboarding-import",
+  "/admin/catalogo-contable",
+  "/admin/indicadores-impuesto",
+  "/admin/mapeo-gastos",
+  "/reportes/gastos-por-centro",
 ];
 
 export const roleRoutes: Record<UserRole, string[]> = {
