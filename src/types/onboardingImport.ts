@@ -87,6 +87,18 @@ export interface PreviewImportResponse {
   rolesCatalog?: RoleCatalogEntry[];
   errors: ImportValidationError[];
   conflicts: ImportConflict[];
+  /** Datos del bloque `organization` en JSON (si existen). */
+  organizationFromFile?: {
+    nombre: string;
+    rfc?: string | null;
+    razonSocial?: string | null;
+    timezone?: string;
+    baseCurrency?: string;
+  };
+  /** El usuario puede crear org nueva con este archivo (JSON + bloque org + permiso). */
+  newOrganizationApplyAvailable?: boolean;
+  /** Coincide con el query `create_new_org=1` usado en el preview; el apply debe enviar lo mismo. */
+  previewCreateNewOrganization?: boolean;
 }
 
 export interface ApplyImportFailure {
@@ -104,4 +116,6 @@ export interface ApplyImportResponse {
    * otro usuario entre el preview y el apply).
    */
   failures?: ApplyImportFailure[];
+  /** Presente cuando se creó una org CLIENT antes de importar usuarios. */
+  createdOrganization?: { id: string; nombre: string };
 }

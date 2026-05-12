@@ -9,8 +9,8 @@
  *   to reload the page. The poll pauses while the tab is hidden to
  *   keep the API quiet.
  *
- * Falls back to a seed dataset until the backend ships
- * GET /reports/expenses-by-cc.
+ * Uses GET /api/reports/expenses-by-cc (`apiRequest` con base `/api`). Si la
+ * petición falla, se mantienen datos de respaldo y un aviso no bloqueante.
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
