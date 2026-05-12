@@ -39,6 +39,7 @@ export const SIDEBAR_CONFIG: Record<string, MenuItem[]> = {
     { label: 'DASHBOARD', route: '/dashboard', icon: 'home' },
     { label: 'COTIZACIONES', route: '/cotizaciones', icon: 'paid' },
     { label: 'COMPROBACIONES', route: '/comprobaciones', icon: 'receipt' },
+    { label: 'EXPORTAR ERP', route: '/exportar-contable', icon: 'cloud_upload' },
     { label: 'GASTO POR CC', route: '/reportes/gastos-por-centro', icon: 'insights' }
   ],
   'Agencia de viajes': [

@@ -34,8 +34,14 @@ export default function CfdiDevPreview({
   registroError,
 }: Props) {
   const cfdi = upload.cfdi;
-  const pdfHref = `${apiBaseUrl}/files/receipt-file/${upload.pdf.fileId}`;
-  const xmlHref = `${apiBaseUrl}/files/receipt-file/${upload.xml.fileId}`;
+  const pdfHref =
+    upload.pdf != null ? `${apiBaseUrl}/files/receipt-file/${upload.pdf.fileId}` : null;
+  const xmlHref =
+    upload.xml != null ? `${apiBaseUrl}/files/receipt-file/${upload.xml.fileId}` : null;
+  const imageHref =
+    upload.receipt_image != null
+      ? `${apiBaseUrl}/files/receipt-file/${upload.receipt_image.fileId}`
+      : null;
 
   return (
     <section
@@ -79,18 +85,41 @@ export default function CfdiDevPreview({
       )}
 
       <div className="text-xs space-y-2 mb-4">
-        <p>
-          <span className="font-medium text-[var(--color-ink-secondary)]">PDF (respaldo):</span>{" "}
-          <a href={pdfHref} className="text-primary-500 hover:underline break-all" target="_blank" rel="noreferrer">
-            Descargar PDF
-          </a>
-        </p>
-        <p>
-          <span className="font-medium text-[var(--color-ink-secondary)]">XML:</span>{" "}
-          <a href={xmlHref} className="text-primary-500 hover:underline break-all" target="_blank" rel="noreferrer">
-            Descargar XML
-          </a>
-        </p>
+        {upload.international && (
+          <p className="text-[var(--color-ink-muted)] mb-2">
+            Subida internacional (sin par PDF/XML clásico).
+          </p>
+        )}
+        {pdfHref ? (
+          <p>
+            <span className="font-medium text-[var(--color-ink-secondary)]">PDF (respaldo):</span>{" "}
+            <a href={pdfHref} className="text-primary-500 hover:underline break-all" target="_blank" rel="noreferrer">
+              Descargar PDF
+            </a>
+          </p>
+        ) : imageHref ? (
+          <p>
+            <span className="font-medium text-[var(--color-ink-secondary)]">Imagen del recibo:</span>{" "}
+            <a
+              href={imageHref}
+              className="text-primary-500 hover:underline break-all"
+              target="_blank"
+              rel="noreferrer"
+            >
+              Descargar imagen
+            </a>
+          </p>
+        ) : (
+          <p className="text-[var(--color-ink-muted)]">Sin archivo PDF/XML en la respuesta.</p>
+        )}
+        {xmlHref ? (
+          <p>
+            <span className="font-medium text-[var(--color-ink-secondary)]">XML:</span>{" "}
+            <a href={xmlHref} className="text-primary-500 hover:underline break-all" target="_blank" rel="noreferrer">
+              Descargar XML
+            </a>
+          </p>
+        ) : null}
       </div>
 
       {upload.registro_sugerido != null && (
