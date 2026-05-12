@@ -9,8 +9,8 @@
  *   - Multipart form with fields "pdf" and "xml" (both required).
  *   - Response: { message, pdf, xml, cfdi?, registro_sugerido? }
  *
- * For international trips (isInternational=true), XML is optional —
- * a default.xml placeholder is fetched from /default.xml before upload.
+ * For international trips (isInternational=true), se sube una sola imagen
+ * JPG/PNG como `receipt_image` a `?isInternational=1` (sin XML).
  *
  * States: idle → dragging → selected → uploading → done (or error).
  */
@@ -36,8 +36,10 @@ export interface ReceiptUploadCfdiSummary {
 
 export interface ReceiptUploadResponse {
   message: string;
-  pdf: { fileId: string; fileName: string };
-  xml: { fileId: string; fileName: string };
+  pdf?: { fileId: string; fileName: string };
+  xml?: { fileId: string; fileName: string };
+  international?: boolean;
+  receipt_image?: { fileId: string; fileName: string };
   cfdi?: ReceiptUploadCfdiSummary;
   registro_sugerido?: Record<string, unknown> | null;
 }
@@ -79,6 +81,11 @@ const ACCEPT_MAP: Record<string, string[]> = {
   "text/xml": [".xml"],
 };
 
+const ACCEPT_MAP_INTERNATIONAL: Record<string, string[]> = {
+  "image/jpeg": [".jpg", ".jpeg"],
+  "image/png": [".png"],
+};
+
 function getExtension(name: string): string {
   const idx = name.lastIndexOf(".");
   return idx >= 0 ? name.slice(idx).toLowerCase() : "";
@@ -114,7 +121,10 @@ async function fetchCsrfToken(apiOrigin: string): Promise<string> {
   return data.csrfToken;
 }
 
-function classifyFiles(files: File[]): {
+function classifyFiles(
+  files: File[],
+  isInternational: boolean,
+): {
   pdf: File | null;
   xml: File | null;
   rejected: string[];
@@ -122,6 +132,19 @@ function classifyFiles(files: File[]): {
   let pdf: File | null = null;
   let xml: File | null = null;
   const rejected: string[] = [];
+
+  if (isInternational) {
+    const imgExt = new Set([".jpg", ".jpeg", ".png"]);
+    for (const file of files) {
+      const ext = getExtension(file.name);
+      if (imgExt.has(ext) && !pdf) {
+        pdf = file;
+      } else if (!imgExt.has(ext)) {
+        rejected.push(file.name);
+      }
+    }
+    return { pdf, xml: null, rejected };
+  }
 
   for (const file of files) {
     const ext = getExtension(file.name);
@@ -136,10 +159,55 @@ function classifyFiles(files: File[]): {
   return { pdf, xml, rejected };
 }
 
-async function fetchDefaultXml(): Promise<File> {
-  const res = await fetch("/default.xml");
-  const blob = await res.blob();
-  return new File([blob], "default.xml", { type: "application/xml" });
+function uploadInternationalImage(
+  url: string,
+  image: File,
+  token: string,
+  onProgress: (pct: number) => void,
+): Promise<ReceiptUploadResponse> {
+  return (async () => {
+    const sep = url.includes("?") ? "&" : "?";
+    const urlWithFlag = `${url}${sep}isInternational=1`;
+    const origin = apiOriginFromUploadUrl(url);
+    if (!origin) {
+      throw new Error("URL de subida inválida");
+    }
+    const csrfToken = await fetchCsrfToken(origin);
+
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      const formData = new FormData();
+      formData.append("receipt_image", image);
+
+      xhr.withCredentials = true;
+
+      xhr.upload.addEventListener("progress", (e) => {
+        if (e.lengthComputable) {
+          onProgress(Math.round((e.loaded / e.total) * 100));
+        }
+      });
+
+      xhr.addEventListener("load", () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          try {
+            resolve(JSON.parse(xhr.responseText));
+          } catch {
+            reject(new Error("Respuesta inesperada del servidor"));
+          }
+        } else {
+          reject(new Error(`Error ${xhr.status}: ${xhr.statusText}`));
+        }
+      });
+
+      xhr.addEventListener("error", () => reject(new Error("Error de red al subir archivos")));
+      xhr.addEventListener("abort", () => reject(new Error("Subida cancelada")));
+
+      xhr.open("POST", urlWithFlag);
+      xhr.setRequestHeader("Authorization", `Bearer ${token}`);
+      xhr.setRequestHeader("csrf-token", csrfToken);
+      xhr.send(formData);
+    });
+  })();
 }
 
 function uploadWithProgress(
@@ -235,7 +303,11 @@ const FileDropZone = forwardRef<FileDropZoneHandle, FileDropZoneProps>(function 
       setProgress(0);
       setErrorMsg("");
 
-      const finalXml = xml ?? (isInternational ? await fetchDefaultXml() : null);
+      if (isInternational) {
+        return uploadInternationalImage(url, pdf, token, setProgress);
+      }
+
+      const finalXml = xml ?? null;
       if (!finalXml) {
         throw new Error("Se requiere un archivo XML para viajes nacionales");
       }
@@ -250,11 +322,19 @@ const FileDropZone = forwardRef<FileDropZoneHandle, FileDropZoneProps>(function 
     ref,
     () => ({
       upload: async (url: string) => {
-        if (!pdfFile) throw new Error("No se ha seleccionado un archivo PDF");
+        if (!pdfFile) {
+          throw new Error(
+            isInternational ? "No se ha seleccionado una imagen del recibo" : "No se ha seleccionado un archivo PDF",
+          );
+        }
         try {
           const response = await doUpload(url, pdfFile, xmlFile);
           setState("done");
-          setDoneFiles([pdfFile.name, xmlFile?.name ?? "default.xml"].filter(Boolean));
+          setDoneFiles(
+            isInternational
+              ? [pdfFile.name]
+              : [pdfFile.name, xmlFile?.name ?? "default.xml"].filter(Boolean),
+          );
           return response;
         } catch (err) {
           const msg = err instanceof Error ? err.message : "Error al subir archivos";
@@ -266,17 +346,19 @@ const FileDropZone = forwardRef<FileDropZoneHandle, FileDropZoneProps>(function 
       getFiles: () => ({ pdf: pdfFile, xml: xmlFile }),
       reset,
     }),
-    [pdfFile, xmlFile, doUpload, reset]
+    [pdfFile, xmlFile, doUpload, reset, isInternational]
   );
 
   const handleDrop = useCallback(
     async (acceptedFiles: File[]) => {
-      const { pdf, xml, rejected } = classifyFiles(acceptedFiles);
+      const { pdf, xml, rejected } = classifyFiles(acceptedFiles, isInternational);
 
       if (rejected.length > 0) {
         setState("error");
         setErrorMsg(
-          `Extensión no válida: ${rejected.join(", ")}. Solo se aceptan .pdf y .xml`
+          isInternational
+            ? `Extensión no válida: ${rejected.join(", ")}. Solo se aceptan .jpg y .png`
+            : `Extensión no válida: ${rejected.join(", ")}. Solo se aceptan .pdf y .xml`
         );
         return;
       }
@@ -298,7 +380,11 @@ const FileDropZone = forwardRef<FileDropZoneHandle, FileDropZoneProps>(function 
         try {
           const response = await doUpload(uploadUrl, nextPdf, nextXml);
           setState("done");
-          setDoneFiles([nextPdf.name, nextXml?.name ?? "default.xml"]);
+          setDoneFiles(
+            isInternational
+              ? [nextPdf.name]
+              : [nextPdf.name, nextXml?.name ?? "default.xml"].filter(Boolean),
+          );
           onUploadComplete?.(response);
         } catch (err) {
           const msg = err instanceof Error ? err.message : "Error al subir archivos";
@@ -317,8 +403,8 @@ const FileDropZone = forwardRef<FileDropZoneHandle, FileDropZoneProps>(function 
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
     onDrop: handleDrop,
-    accept: ACCEPT_MAP,
-    maxFiles: 2,
+    accept: isInternational ? ACCEPT_MAP_INTERNATIONAL : ACCEPT_MAP,
+    maxFiles: isInternational ? 1 : 2,
     disabled: state === "uploading",
     noClick: state === "uploading",
     noDrag: state === "uploading",
@@ -342,7 +428,7 @@ const FileDropZone = forwardRef<FileDropZoneHandle, FileDropZoneProps>(function 
           ${state === "uploading" ? "cursor-default" : ""}
         `}
         role="button"
-        aria-label="Zona de carga de archivos PDF y XML"
+        aria-label={isInternational ? "Zona de carga de imagen del recibo" : "Zona de carga de archivos PDF y XML"}
       >
         <input {...getInputProps()} />
 
@@ -398,8 +484,14 @@ function IdleContent({ isInternational }: { isInternational: boolean }) {
           Arrastra tus archivos aquí
         </p>
         <p className="text-xs text-[var(--color-ink-muted)] mt-1">
-          o haz clic para seleccionar &middot; <strong>.pdf</strong>
-          {!isInternational && <> y <strong>.xml</strong></>}
+          o haz clic para seleccionar &middot;{" "}
+          {isInternational ? (
+            <strong>.jpg / .png</strong>
+          ) : (
+            <>
+              <strong>.pdf</strong> y <strong>.xml</strong>
+            </>
+          )}
         </p>
       </div>
     </div>
@@ -431,13 +523,17 @@ function SelectedContent({
   return (
     <div className="w-full max-w-none mx-auto px-0 sm:px-2">
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-3 items-start">
-        <FileChip label="PDF" fileName={pdfName} missing={needsPdf} />
+        <FileChip
+          label={isInternational ? "Imagen" : "PDF"}
+          fileName={pdfName}
+          missing={needsPdf}
+        />
         {!isInternational && (
           <FileChip label="XML" fileName={xmlName} missing={needsXml} />
         )}
         {isInternational && !xmlName && (
           <p className="text-xs text-[var(--color-ink-muted)] text-center mt-1 sm:col-span-2">
-            Viaje internacional — se usará XML por defecto
+            Gasto internacional — solo imagen del recibo
           </p>
         )}
       </div>

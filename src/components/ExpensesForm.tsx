@@ -77,6 +77,10 @@ export default function ExpensesFormClient({ requestId, token, receiptToReplace 
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [xmlFile, setXmlFile] = useState<File | null>(null);
   const [isInternational, setIsInternational] = useState(false);
+  const [intlCurrency, setIntlCurrency] = useState<"USD" | "EUR" | "GBP" | "JPY" | "CAD">("USD");
+  const [fechaComprobante, setFechaComprobante] = useState(() =>
+    new Date().toISOString().slice(0, 10),
+  );
   const [submitting, setSubmitting] = useState(false);
   const [devUploadResult, setDevUploadResult] = useState<ReceiptUploadResponse | null>(null);
   const [devReceiptId, setDevReceiptId] = useState<number | null>(null);
@@ -106,7 +110,7 @@ export default function ExpensesFormClient({ requestId, token, receiptToReplace 
           requestId,
           receiptTypeId,
           amount: parseFloat(monto),
-          currency: isInternational ? "USD" : "MXN",
+          currency: isInternational ? intlCurrency : "MXN",
         },
       });
       setPolicyPreview(result);
@@ -210,8 +214,28 @@ export default function ExpensesFormClient({ requestId, token, receiptToReplace 
       const uploadUrl = `${API_BASE_URL}/files/upload-receipt-files/${lastReceiptId}`;
       const uploadRes = await dropZoneRef.current!.upload(uploadUrl);
 
-      // 4. Persistir CFDI en cfdi_comprobantes + SAT cuando el XML permitió armar el cuerpo
-      if (uploadRes.registro_sugerido && typeof uploadRes.registro_sugerido === "object") {
+      if (isInternational) {
+        try {
+          await apiRequest(`/comprobantes/${lastReceiptId}`, {
+            method: "POST",
+            data: {
+              is_international: true,
+              descripcion: `${concepto} — comprobante internacional`,
+              total: parseFloat(monto),
+              moneda: intlCurrency,
+              fecha_emision: new Date(`${fechaComprobante}T12:00:00`).toISOString(),
+              receipt_type_id: CONCEPTO_TO_RECEIPT_TYPE_ID[concepto],
+            },
+            headers: { Authorization: `Bearer ${token}` },
+          });
+        } catch (regErr) {
+          console.error(regErr);
+          const msg = formatRegistroError(regErr);
+          showAppAlert(msg, { variant: "error" });
+          setSubmitting(false);
+          return;
+        }
+      } else if (uploadRes.registro_sugerido && typeof uploadRes.registro_sugerido === "object") {
         try {
           const regRes = await apiRequest(`/comprobantes/${lastReceiptId}`, {
             method: "POST",
@@ -345,6 +369,48 @@ export default function ExpensesFormClient({ requestId, token, receiptToReplace 
         />
         Es viaje internacional
       </label>
+
+      {isInternational && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label
+              htmlFor="intlCurrency"
+              className="block text-sm font-medium mb-1.5 text-[var(--color-ink-secondary)]"
+            >
+              Moneda del recibo
+            </label>
+            <select
+              id="intlCurrency"
+              className="w-full border border-[var(--color-neutral-300)] rounded-[var(--radius-md)] px-3 py-2.5 text-sm bg-[var(--color-surface-white)] text-[var(--color-ink)]"
+              value={intlCurrency}
+              onChange={(e) =>
+                setIntlCurrency(e.target.value as typeof intlCurrency)
+              }
+            >
+              <option value="USD">USD</option>
+              <option value="EUR">EUR</option>
+              <option value="GBP">GBP</option>
+              <option value="JPY">JPY</option>
+              <option value="CAD">CAD</option>
+            </select>
+          </div>
+          <div>
+            <label
+              htmlFor="fechaComprobante"
+              className="block text-sm font-medium mb-1.5 text-[var(--color-ink-secondary)]"
+            >
+              Fecha del gasto
+            </label>
+            <input
+              id="fechaComprobante"
+              type="date"
+              className="w-full border border-[var(--color-neutral-300)] rounded-[var(--radius-md)] px-3 py-2.5 text-sm bg-[var(--color-surface-white)] text-[var(--color-ink)]"
+              value={fechaComprobante}
+              onChange={(e) => setFechaComprobante(e.target.value)}
+            />
+          </div>
+        </div>
+      )}
 
       {/* ── Drag & drop file zone ── */}
       <FileDropZone

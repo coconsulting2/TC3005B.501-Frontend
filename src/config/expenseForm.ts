@@ -23,4 +23,6 @@ export interface ParsedXmlData {
   fecha_emision: string;
   monto_total: number;
   uuid: string;
+  /** Cuerpo completo sugerido para POST /comprobantes/:receipt_id (nacional). */
+  registro_sugerido?: Record<string, unknown> | null;
 }

@@ -1,0 +1,32 @@
+---
+/**
+ * /exportar-contable — Exportación contable para ERP.
+ *
+ * Accessible to "Cuentas por pagar" role. Queries the backend
+ * GET /api/export/contable endpoint and renders a preview of the
+ * structured polizas JSON that the ERP will consume.
+ */
+
+import MainLayout from "@layouts/MainLayout.astro";
+import EditorialHeader from "@components/EditorialHeader.astro";
+import AccountingExportPanel from "@components/AccountingExportPanel";
+
+import type { UserRole } from "@type/roles";
+import { getCookie } from "@data/cookies";
+import { roleLabels } from "@config/role-labels";
+
+const role: UserRole = getCookie("role", Astro.cookies) as UserRole;
+const userName = getCookie("username", Astro.cookies);
+const buttonLabel = roleLabels[role];
+---
+
+<MainLayout title="Exportar para ERP" data={{ userName, buttonLabel, role }}>
+  <div>
+    <EditorialHeader
+      eyebrow="Coco / Finanzas / Exportar ERP"
+      title="Exportación contable"
+      subtitle="Consulta y descarga las pólizas contables listas para integrar con el ERP."
+    />
+    <AccountingExportPanel client:only="react" />
+  </div>
+</MainLayout>
