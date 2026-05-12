@@ -9,6 +9,17 @@ import type { Organization } from "@type/organization";
 const STORAGE_KEY_ORG = "coco:currentOrg";
 const STORAGE_KEY_IMPERSONATE = "coco:impersonatedOrgId";
 
+/** Clave localStorage (p. ej. listener `storage` entre pestañas). */
+export const IMPERSONATED_ORG_ID_STORAGE_KEY = STORAGE_KEY_IMPERSONATE;
+
+/** Misma pestaña: `setImpersonatedOrgId` / `clearOrgStore` disparan este evento. */
+export const IMPERSONATED_ORG_CHANGE_EVENT = "coco:impersonatedOrgIdChanged";
+
+function notifyImpersonatedOrgChanged(): void {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new CustomEvent(IMPERSONATED_ORG_CHANGE_EVENT));
+}
+
 let currentOrg: Organization | null = null;
 
 const readWindow = <T>(key: string): T | null => {
@@ -53,6 +64,7 @@ export const clearOrgStore = (): void => {
       window.localStorage.removeItem(STORAGE_KEY_ORG);
       window.localStorage.removeItem(STORAGE_KEY_IMPERSONATE);
     } catch { /* ignore */ }
+    notifyImpersonatedOrgChanged();
   }
 };
 
@@ -62,6 +74,7 @@ export const clearOrgStore = (): void => {
  */
 export const setImpersonatedOrgId = (orgId: string | null): void => {
   writeWindow(STORAGE_KEY_IMPERSONATE, orgId);
+  notifyImpersonatedOrgChanged();
 };
 
 export const getImpersonatedOrgId = (): string | null => {
