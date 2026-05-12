@@ -155,6 +155,25 @@ export default function ExpensesFormClient({ requestId, token, receiptToReplace 
         return;
       }
 
+      if (isInternational) {
+        const ymd = fechaComprobante?.trim() ?? "";
+        if (!ymd) {
+          showAppAlert("La fecha del comprobante es obligatoria para recibos internacionales.", {
+            variant: "warning",
+          });
+          setSubmitting(false);
+          return;
+        }
+        const emisionIntl = new Date(`${ymd}T12:00:00`);
+        if (Number.isNaN(emisionIntl.getTime())) {
+          showAppAlert("La fecha del comprobante no es válida. Elige una fecha en el calendario.", {
+            variant: "warning",
+          });
+          setSubmitting(false);
+          return;
+        }
+      }
+
       // M2-006 RF-44 — pre-evaluar contra política antes de subir nada.
       const policyOk = await checkPolicyBeforeSubmit();
       if (!policyOk) {
@@ -215,6 +234,8 @@ export default function ExpensesFormClient({ requestId, token, receiptToReplace 
       const uploadRes = await dropZoneRef.current!.upload(uploadUrl);
 
       if (isInternational) {
+        const ymd = fechaComprobante.trim();
+        const emisionIntl = new Date(`${ymd}T12:00:00`);
         try {
           await apiRequest(`/comprobantes/${lastReceiptId}`, {
             method: "POST",
@@ -223,7 +244,7 @@ export default function ExpensesFormClient({ requestId, token, receiptToReplace 
               descripcion: `${concepto} — comprobante internacional`,
               total: parseFloat(monto),
               moneda: intlCurrency,
-              fecha_emision: new Date(`${fechaComprobante}T12:00:00`).toISOString(),
+              fecha_emision: emisionIntl.toISOString(),
               receipt_type_id: CONCEPTO_TO_RECEIPT_TYPE_ID[concepto],
             },
             headers: { Authorization: `Bearer ${token}` },

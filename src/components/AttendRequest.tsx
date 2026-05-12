@@ -111,6 +111,12 @@ export default function AttendRequest({ request_id, token }: Props) {
   );
 
   const finalizarAtencion = useCallback(async () => {
+    if (!selected) {
+      showAppAlert("Selecciona y guarda una oferta de vuelo antes de finalizar la atención.", {
+        variant: "warning",
+      });
+      return;
+    }
     setSubmitting(true);
     try {
       await apiRequest(`/travel-agent/attend-travel-request/${request_id}`, {
@@ -127,7 +133,7 @@ export default function AttendRequest({ request_id, token }: Props) {
     } finally {
       setSubmitting(false);
     }
-  }, [request_id, token]);
+  }, [request_id, token, selected]);
 
   function formatTime(iso: string) {
     try {
@@ -268,7 +274,7 @@ export default function AttendRequest({ request_id, token }: Props) {
           modal_type="success"
           onConfirm={finalizarAtencion}
           variant="filled"
-          disabled={submitting}
+          disabled={submitting || !selected}
         >
           {submitting ? "Procesando…" : "Finalizar atención"}
         </ModalWrapper>
