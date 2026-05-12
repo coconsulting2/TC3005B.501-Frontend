@@ -21,6 +21,7 @@ export const SIDEBAR_CONFIG: Record<string, MenuItem[]> = {
     { label: 'DRAFT SOLICITUDES', route: '/solicitudes-draft', icon: 'draft' },
     { label: 'COMPROBAR GASTOS', route: '/comprobar-gastos', icon: 'payments' },
     { label: 'REEMBOLSOS', route: '/reembolso', icon: 'paid' },
+    { label: 'GASTO POR CC', route: '/reportes/gastos-por-centro', icon: 'insights' },
     { label: 'HISTORIAL DE VIAJES', route: '/historial', icon: 'inventory' }
   ],
   'N2': [
@@ -31,12 +32,14 @@ export const SIDEBAR_CONFIG: Record<string, MenuItem[]> = {
     { label: 'DRAFT SOLICITUDES', route: '/solicitudes-draft', icon: 'draft' },
     { label: 'COMPROBAR GASTOS', route: '/comprobar-gastos', icon: 'payments' },
     { label: 'REEMBOLSOS', route: '/reembolso', icon: 'paid' },
+    { label: 'GASTO POR CC', route: '/reportes/gastos-por-centro', icon: 'insights' },
     { label: 'HISTORIAL DE VIAJES', route: '/historial', icon: 'inventory' }
   ],
   'Cuentas por pagar': [
     { label: 'DASHBOARD', route: '/dashboard', icon: 'home' },
     { label: 'COTIZACIONES', route: '/cotizaciones', icon: 'paid' },
-    { label: 'COMPROBACIONES', route: '/comprobaciones', icon: 'receipt' }
+    { label: 'COMPROBACIONES', route: '/comprobaciones', icon: 'receipt' },
+    { label: 'GASTO POR CC', route: '/reportes/gastos-por-centro', icon: 'insights' }
   ],
   'Agencia de viajes': [
     { label: 'DASHBOARD', route: '/dashboard', icon: 'home' },
@@ -54,7 +57,9 @@ export const SIDEBAR_CONFIG: Record<string, MenuItem[]> = {
     // M3-007 — Catálogo contable y mapeo de tipos de gasto
     { label: 'CATÁLOGO CONTABLE', route: '/admin/catalogo-contable', icon: 'account_balance' },
     { label: 'INDICADORES DE IMPUESTO', route: '/admin/indicadores-impuesto', icon: 'percent' },
-    { label: 'MAPEO DE GASTOS', route: '/admin/mapeo-gastos', icon: 'sync_alt' }
+    { label: 'MAPEO DE GASTOS', route: '/admin/mapeo-gastos', icon: 'sync_alt' },
+    // M3-009 — Dashboard de gasto por centro de costos
+    { label: 'GASTO POR CC', route: '/reportes/gastos-por-centro', icon: 'insights' }
   ],
   'Admin Ditta': [
     { label: 'DASHBOARD', route: '/dashboard', icon: 'home' },
@@ -67,5 +72,6 @@ export const SIDEBAR_CONFIG: Record<string, MenuItem[]> = {
     { label: 'CATÁLOGO CONTABLE', route: '/admin/catalogo-contable', icon: 'account_balance' },
     { label: 'INDICADORES DE IMPUESTO', route: '/admin/indicadores-impuesto', icon: 'percent' },
     { label: 'MAPEO DE GASTOS', route: '/admin/mapeo-gastos', icon: 'sync_alt' },
+    { label: 'GASTO POR CC', route: '/reportes/gastos-por-centro', icon: 'insights' },
   ],
 };
