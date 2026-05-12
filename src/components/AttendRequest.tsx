@@ -4,8 +4,6 @@ import ModalWrapper from "@components/ModalWrapper";
 import Toast from "@components/Toast";
 import { showAppAlert } from "@utils/appAlert";
 
-const API_BASE = import.meta.env.PUBLIC_API_BASE_URL || "https://localhost:3000/api";
-
 const IATA_SUGGESTIONS = [
   "MEX",
   "GDL",
