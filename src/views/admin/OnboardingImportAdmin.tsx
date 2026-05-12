@@ -145,16 +145,23 @@ export default function OnboardingImportAdmin({ orgId }: Props) {
       }
     }
     if (!g) {
-      // Si el backend no envió applyableUsernames, la tabla puede ser solo una porción
-      // (preview.preview muestra los primeros N): no podemos garantizar que cada usuario
-      // tenga override individual, así que exigimos contraseña global.
-      if (!preview.applyableUsernames) {
+      // Lista de usuarios sobre los que validar overrides individuales:
+      //  - Si el backend mandó applyableUsernames, lo usamos (cubre filas no visibles).
+      //  - Si no, solo confiamos en preview.preview cuando contiene TODOS los válidos.
+      //  - Si la tabla está truncada y no hay applyableUsernames, exigimos global.
+      let usersToCheck: string[] | null = null;
+      if (preview.applyableUsernames) {
+        usersToCheck = preview.applyableUsernames;
+      } else if (preview.preview.length >= preview.validRows) {
+        usersToCheck = preview.preview.map((u) => u.userName);
+      }
+      if (!usersToCheck) {
         setPreviewApplyError(
           "Define una contraseña global: la tabla solo muestra una porción y no podemos asegurar la contraseña de los usuarios no visibles."
         );
         return;
       }
-      const missing = preview.applyableUsernames.filter(
+      const missing = usersToCheck.filter(
         (un) => !(passwordOverridesByUser[un] ?? "").trim()
       );
       if (missing.length > 0) {
@@ -754,7 +761,7 @@ function PreviewPanel({
                           autoComplete="new-password"
                           value={passwordOverridesByUser[u.userName] ?? ""}
                           onChange={(e) => onPasswordOverrideChange(u.userName, e.target.value)}
-                          placeholder="Vacío: usar global"
+                          placeholder="Vacío: archivo o global"
                           style={{
                             width: "100%",
                             minWidth: 140,
