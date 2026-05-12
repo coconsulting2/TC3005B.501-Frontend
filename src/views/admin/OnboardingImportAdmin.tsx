@@ -72,6 +72,8 @@ export default function OnboardingImportAdmin({ orgId }: Props) {
   >({});
   const [globalPassword, setGlobalPassword] = useState("");
   const [passwordOverridesByUser, setPasswordOverridesByUser] = useState<Record<string, string>>({});
+  /** userName → rol elegido en la UI (sobrescribe el del archivo y los mappings). */
+  const [roleOverridesByUser, setRoleOverridesByUser] = useState<Record<string, string>>({});
   const [previewApplyError, setPreviewApplyError] = useState("");
 
   const inputRef = useRef<HTMLInputElement>(null);
@@ -86,6 +88,7 @@ export default function OnboardingImportAdmin({ orgId }: Props) {
     setPermissionExtrasByUser({});
     setGlobalPassword("");
     setPasswordOverridesByUser({});
+    setRoleOverridesByUser({});
     setPreviewApplyError("");
   }, [preview?.previewToken]);
 
@@ -141,6 +144,20 @@ export default function OnboardingImportAdmin({ orgId }: Props) {
         return;
       }
     }
+    if (!g) {
+      const applyable = preview.applyableUsernames ?? preview.preview.map((u) => u.userName);
+      const missing = applyable.filter(
+        (un) => !(passwordOverridesByUser[un] ?? "").trim()
+      );
+      if (missing.length > 0) {
+        const sample = missing.slice(0, 3).join(", ");
+        const more = missing.length > 3 ? ` y ${missing.length - 3} más` : "";
+        setPreviewApplyError(
+          `Define una contraseña global o una por usuario. Sin contraseña: ${sample}${more}.`
+        );
+        return;
+      }
+    }
     setPreviewApplyError("");
 
     setPhase("applying");
@@ -158,9 +175,15 @@ export default function OnboardingImportAdmin({ orgId }: Props) {
       for (const [un, pwd] of Object.entries(passwordOverridesByUser)) {
         if (pwd.trim()) pwdOverrides[un] = pwd.trim();
       }
+      const roleOverridesPayload: Record<string, string> = {};
+      for (const [un, role] of Object.entries(roleOverridesByUser)) {
+        if (role.trim()) roleOverridesPayload[un] = role.trim();
+      }
 
       const res = await applyImportPreview(preview.previewToken, orgId, {
         roleMappings: preview.needsRoleMappingCount > 0 ? maps : undefined,
+        roleOverrides:
+          Object.keys(roleOverridesPayload).length > 0 ? roleOverridesPayload : undefined,
         permissionExtras:
           Object.keys(extrasPayload).length > 0 ? extrasPayload : undefined,
         passwordGlobal: g || undefined,
@@ -184,6 +207,7 @@ export default function OnboardingImportAdmin({ orgId }: Props) {
     setPermissionExtrasByUser({});
     setGlobalPassword("");
     setPasswordOverridesByUser({});
+    setRoleOverridesByUser({});
     setPreviewApplyError("");
   };
 
@@ -256,6 +280,15 @@ export default function OnboardingImportAdmin({ orgId }: Props) {
           passwordOverridesByUser={passwordOverridesByUser}
           onPasswordOverrideChange={(userName, value) => {
             setPasswordOverridesByUser((prev) => ({ ...prev, [userName]: value }));
+          }}
+          roleOverridesByUser={roleOverridesByUser}
+          onRoleOverrideChange={(userName, roleName) => {
+            setRoleOverridesByUser((prev) => {
+              const next = { ...prev };
+              if (roleName) next[userName] = roleName;
+              else delete next[userName];
+              return next;
+            });
           }}
           applyError={previewApplyError}
           onDismissApplyError={() => setPreviewApplyError("")}
@@ -334,6 +367,8 @@ function PreviewPanel({
   onGlobalPasswordChange,
   passwordOverridesByUser,
   onPasswordOverrideChange,
+  roleOverridesByUser,
+  onRoleOverrideChange,
   applyError,
   onDismissApplyError,
   onApply,
@@ -349,6 +384,9 @@ function PreviewPanel({
   onGlobalPasswordChange: (v: string) => void;
   passwordOverridesByUser: Record<string, string>;
   onPasswordOverrideChange: (userName: string, value: string) => void;
+  roleOverridesByUser: Record<string, string>;
+  /** Pasa "" para limpiar el override y volver al rol del archivo. */
+  onRoleOverrideChange: (userName: string, roleName: string) => void;
   applyError: string;
   onDismissApplyError: () => void;
   onApply: () => void;
@@ -356,16 +394,50 @@ function PreviewPanel({
 }) {
   const [extrasModalUser, setExtrasModalUser] = useState<string | null>(null);
 
-  const extrasModalRow = useMemo(
-    () => preview.preview.find((u) => u.userName === extrasModalUser) ?? null,
-    [preview.preview, extrasModalUser]
-  );
-
   const catalog = preview.permissionsCatalog;
   const applyableTotal = preview.applyableUsernames?.length ?? preview.validRows;
 
+  /** roleName (lower) → códigos de permiso del rol. */
+  const rolePermissionsByName = useMemo(() => {
+    const m = new Map<string, string[]>();
+    for (const r of preview.rolesCatalog ?? []) {
+      m.set(r.roleName.toLowerCase(), r.effectivePermissions);
+    }
+    return m;
+  }, [preview.rolesCatalog]);
+
+  /**
+   * Devuelve la fila con `roleName` y `rolePermissionCodes` reemplazados por el
+   * rol que el admin haya elegido en la UI. Sin override, devuelve la original.
+   */
+  const getEffectiveRow = useCallback(
+    (u: ImportUserPreview): ImportUserPreview => {
+      const override = (roleOverridesByUser[u.userName] ?? "").trim();
+      if (!override) return u;
+      const codes = rolePermissionsByName.get(override.toLowerCase()) ?? [];
+      return {
+        ...u,
+        roleName: override,
+        rolePermissionCodes: codes,
+        effectivePermissions: codes,
+        needsRoleMapping: false,
+      };
+    },
+    [roleOverridesByUser, rolePermissionsByName]
+  );
+
+  const extrasModalRow = useMemo(() => {
+    if (!extrasModalUser) return null;
+    const found = preview.preview.find((u) => u.userName === extrasModalUser);
+    return found ? getEffectiveRow(found) : null;
+  }, [preview.preview, extrasModalUser, getEffectiveRow]);
+
   const hasErrors    = preview.errors.length > 0;
   const hasConflicts = preview.conflicts.length > 0;
+  const rolesAvailable = (preview.rolesCatalog ?? []).map((r) => r.roleName);
+  // El mapping de etiquetas externas se decide en el panel de arriba (afecta a todos
+  // los usuarios con esa etiqueta, incluso los que no caben en la tabla). El override
+  // por fila cambia el rol final solo para esa persona.
   const mappingComplete =
     !preview.needsRoleMappingCount ||
     (preview.unmappedExternalRoles ?? []).every(
@@ -444,20 +516,36 @@ function PreviewPanel({
         >
           <strong style={{ color: T.ink }}>Contraseñas</strong>
           <p style={{ margin: "8px 0 10px", lineHeight: 1.45 }}>
-            Por defecto se usa la contraseña de cada fila del archivo. Puedes definir una{" "}
-            <strong>contraseña común</strong> para todos los usuarios válidos ({applyableTotal}) o
-            sustituir solo en las filas de la tabla. {PASSWORD_HINT}
+            Por seguridad, las contraseñas que vinieran en el archivo no se usan al importar:
+            define una <strong>contraseña común</strong> para todos los usuarios válidos
+            ({applyableTotal}) o una contraseña por usuario en la tabla. {PASSWORD_HINT}
           </p>
+          {preview.fileHadPasswords ? (
+            <p
+              style={{
+                margin: "0 0 10px",
+                padding: "8px 10px",
+                background: T.warningBg,
+                border: `1px solid ${T.warningBorder}`,
+                borderRadius: 6,
+                fontSize: 12,
+                color: T.warning,
+              }}
+            >
+              El archivo traía contraseñas: fueron descartadas. Asigna una global o una por usuario
+              antes de importar.
+            </p>
+          ) : null}
           <label style={{ display: "block", marginBottom: 8 }}>
             <span style={{ display: "block", fontSize: 12, fontWeight: 600, color: T.inkSecondary, marginBottom: 4 }}>
-              Misma contraseña para todo el lote (opcional)
+              Misma contraseña para todo el lote
             </span>
             <input
               type="password"
               autoComplete="new-password"
               value={globalPassword}
               onChange={(e) => onGlobalPasswordChange(e.target.value)}
-              placeholder="Dejar vacío = usar la del archivo"
+              placeholder="Define una contraseña común para todos…"
               style={{
                 width: "100%",
                 maxWidth: 360,
@@ -641,54 +729,54 @@ function PreviewPanel({
                 </tr>
               </thead>
               <tbody>
-                {preview.preview.map((u, i) => (
-                  <tr
-                    key={`${u.userName}-${i}`}
-                    style={{ background: i % 2 === 0 ? T.surface : T.rowAlt }}
-                  >
-                    <td style={tdStyle}>{u.userName}</td>
-                    <td style={tdStyle}>{u.email}</td>
-                    <td style={tdStyle}>
-                      <input
-                        type="password"
-                        autoComplete="new-password"
-                        value={passwordOverridesByUser[u.userName] ?? ""}
-                        onChange={(e) => onPasswordOverrideChange(u.userName, e.target.value)}
-                        placeholder="Vacío: archivo o global"
-                        style={{
-                          width: "100%",
-                          minWidth: 140,
-                          maxWidth: 200,
-                          padding: "6px 8px",
-                          borderRadius: 6,
-                          border: `1px solid ${T.border}`,
-                          fontSize: 12,
-                          background: T.surface,
-                        }}
-                      />
-                    </td>
-                    <td style={tdStyle}>
-                      {u.needsRoleMapping ? (
-                        <>
-                          <div style={{ fontWeight: 600, color: T.warning }}>
-                            Etiqueta en archivo: {u.externalRoleLabel ?? "—"}
-                          </div>
-                          <span style={{ fontSize: 11, color: T.inkMuted }}>
-                            Pendiente: elige el rol equivalente en el panel de arriba.
-                          </span>
-                        </>
-                      ) : (
-                        <RolePermissionsSummary
-                          row={u}
+                {preview.preview.map((u, i) => {
+                  const eff = getEffectiveRow(u);
+                  const overrideValue = roleOverridesByUser[u.userName] ?? "";
+                  const stillNeedsMapping = Boolean(u.needsRoleMapping) && !overrideValue.trim();
+                  return (
+                    <tr
+                      key={`${u.userName}-${i}`}
+                      style={{ background: i % 2 === 0 ? T.surface : T.rowAlt }}
+                    >
+                      <td style={tdStyle}>{u.userName}</td>
+                      <td style={tdStyle}>{u.email}</td>
+                      <td style={tdStyle}>
+                        <input
+                          type="password"
+                          autoComplete="new-password"
+                          value={passwordOverridesByUser[u.userName] ?? ""}
+                          onChange={(e) => onPasswordOverrideChange(u.userName, e.target.value)}
+                          placeholder="Vacío: archivo o global"
+                          style={{
+                            width: "100%",
+                            minWidth: 140,
+                            maxWidth: 200,
+                            padding: "6px 8px",
+                            borderRadius: 6,
+                            border: `1px solid ${T.border}`,
+                            fontSize: 12,
+                            background: T.surface,
+                          }}
+                        />
+                      </td>
+                      <td style={tdStyle}>
+                        <RolePermissionsCell
+                          row={eff}
+                          baseRoleName={u.roleName}
+                          externalLabel={u.externalRoleLabel}
+                          stillNeedsMapping={stillNeedsMapping}
+                          rolesAvailable={rolesAvailable}
+                          overrideValue={overrideValue}
+                          onOverrideChange={(v) => onRoleOverrideChange(u.userName, v)}
                           extraCount={(permissionExtrasByUser[u.userName] ?? []).length}
-                          canEdit={Boolean(catalog?.groups?.length)}
+                          canEdit={Boolean(catalog?.groups?.length) && !stillNeedsMapping}
                           onEdit={() => setExtrasModalUser(u.userName)}
                         />
-                      )}
-                    </td>
-                    <td style={tdStyle}>{u.department ?? "—"}</td>
-                  </tr>
-                ))}
+                      </td>
+                      <td style={tdStyle}>{u.department ?? "—"}</td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -772,6 +860,33 @@ function DonePanel({
         {result.created !== 1 ? "s" : ""} creados
         {result.skipped > 0 ? `, ${result.skipped} omitidos` : ""}.
       </StatusBanner>
+      {result.failures && result.failures.length > 0 && (
+        <div
+          role="alert"
+          style={{
+            marginBottom: 16,
+            padding: "12px 14px",
+            borderRadius: 8,
+            border: `1px solid ${T.warningBorder}`,
+            background: T.warningBg,
+            color: T.warning,
+            fontSize: 13,
+          }}
+        >
+          <strong>Filas con conflicto al guardar ({result.failures.length}):</strong>
+          <ul style={{ margin: "8px 0 0", paddingLeft: 18 }}>
+            {result.failures.map((f) => (
+              <li key={f.userName}>
+                <code style={{ fontFamily: "ui-monospace, monospace", fontSize: 12 }}>
+                  {f.userName}
+                </code>
+                {" — "}
+                {f.reason}
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
       {result.createdUsers.length > 0 && (
         <div style={{ overflowX: "auto", marginBottom: 16 }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
@@ -890,38 +1005,108 @@ function ConflictList({ conflicts }: { conflicts: ImportConflict[] }) {
   );
 }
 
-function RolePermissionsSummary({
+function RolePermissionsCell({
   row,
+  baseRoleName,
+  externalLabel,
+  stillNeedsMapping,
+  rolesAvailable,
+  overrideValue,
+  onOverrideChange,
   extraCount,
   canEdit,
   onEdit,
 }: {
+  /** Fila con el rol "efectivo" (override aplicado si existe). */
   row: ImportUserPreview;
+  /** Rol que venía del archivo/preview, antes del override. */
+  baseRoleName?: string;
+  externalLabel?: string;
+  stillNeedsMapping: boolean;
+  rolesAvailable: string[];
+  overrideValue: string;
+  onOverrideChange: (roleName: string) => void;
   extraCount: number;
   canEdit: boolean;
   onEdit: () => void;
 }) {
   const roleCodes = row.rolePermissionCodes ?? row.effectivePermissions ?? [];
   const nRole = roleCodes.length;
+  const isOverridden = overrideValue.trim().length > 0;
 
   return (
     <div>
-      <div style={{ fontWeight: 600, color: T.ink }}>{row.roleName}</div>
-      <p style={{ margin: "6px 0 4px", fontSize: 12, color: T.inkMuted }}>
-        {nRole} permiso{nRole !== 1 ? "s" : ""} desde el rol
-        {extraCount > 0 ? (
-          <span style={{ color: T.primary, fontWeight: 600 }}>
-            {" "}
-            · +{extraCount} adicional{extraCount !== 1 ? "es" : ""}
-          </span>
-        ) : null}
-      </p>
+      {stillNeedsMapping ? (
+        <>
+          <div style={{ fontWeight: 600, color: T.warning }}>
+            Etiqueta en archivo: {externalLabel ?? "—"}
+          </div>
+          <p style={{ margin: "4px 0 6px", fontSize: 11, color: T.inkMuted }}>
+            Sin rol equivalente. Usa el panel de arriba para mapear toda la etiqueta o
+            elige aquí un rol solo para esta persona.
+          </p>
+        </>
+      ) : (
+        <>
+          <div style={{ fontWeight: 600, color: T.ink }}>{row.roleName ?? "—"}</div>
+          <p style={{ margin: "6px 0 4px", fontSize: 12, color: T.inkMuted }}>
+            {nRole} permiso{nRole !== 1 ? "s" : ""} desde el rol
+            {extraCount > 0 ? (
+              <span style={{ color: T.primary, fontWeight: 600 }}>
+                {" "}
+                · +{extraCount} adicional{extraCount !== 1 ? "es" : ""}
+              </span>
+            ) : null}
+          </p>
+        </>
+      )}
+
+      <select
+        value={overrideValue}
+        onChange={(e) => onOverrideChange(e.target.value)}
+        title={
+          isOverridden && baseRoleName
+            ? `Rol original del archivo: ${baseRoleName}`
+            : "Cambiar rol asignado a esta persona"
+        }
+        style={{
+          width: "100%",
+          minWidth: 160,
+          maxWidth: 220,
+          padding: "6px 8px",
+          borderRadius: 6,
+          border: `1px solid ${isOverridden ? T.primary : T.border}`,
+          fontSize: 12,
+          background: T.surface,
+          color: T.ink,
+          marginTop: 4,
+        }}
+      >
+        <option value="">
+          {baseRoleName
+            ? `Mantener: ${baseRoleName}`
+            : stillNeedsMapping
+              ? "Elegir rol para esta persona…"
+              : "Mantener rol del archivo"}
+        </option>
+        {rolesAvailable.map((rn) => (
+          <option key={rn} value={rn}>
+            {rn}
+          </option>
+        ))}
+      </select>
+      {isOverridden ? (
+        <p style={{ margin: "4px 0 0", fontSize: 11, color: T.primary }}>
+          Rol cambiado en la UI{baseRoleName ? ` (archivo: ${baseRoleName})` : ""}.
+        </p>
+      ) : null}
+
       {canEdit ? (
         <button
           type="button"
           onClick={onEdit}
           style={{
-            marginTop: 6,
+            marginTop: 8,
             padding: "7px 14px",
             fontSize: 12,
             fontWeight: 600,
@@ -934,9 +1119,9 @@ function RolePermissionsSummary({
         >
           Ver / añadir permisos
         </button>
-      ) : (
+      ) : !stillNeedsMapping ? (
         <span style={{ fontSize: 11, color: T.inkMuted }}>Sin catálogo de permisos</span>
-      )}
+      ) : null}
     </div>
   );
 }
