@@ -357,7 +357,7 @@ const FileDropZone = forwardRef<FileDropZoneHandle, FileDropZoneProps>(function 
         setState("error");
         setErrorMsg(
           isInternational
-            ? `Extensión no válida: ${rejected.join(", ")}. Solo se aceptan .jpg y .png`
+            ? `Extensión no válida: ${rejected.join(", ")}. Solo se aceptan .jpg, .jpeg y .png`
             : `Extensión no válida: ${rejected.join(", ")}. Solo se aceptan .pdf y .xml`
         );
         return;

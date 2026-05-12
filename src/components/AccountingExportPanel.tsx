@@ -9,7 +9,7 @@
  * { polizas: [...] } with the full SAP-compatible póliza structure.
  */
 
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import Button from "@components/Button";
 import Toast from "@components/Toast";
 
@@ -48,13 +48,33 @@ function thirtyDaysAgoISO(): string {
   return d.toISOString().slice(0, 10);
 }
 
-function formatMxn(value: number | undefined): string {
+function formatMoney(value: number | undefined, currency = "MXN"): string {
   if (value == null) return "—";
-  return value.toLocaleString("es-MX", {
-    style: "currency",
-    currency: "MXN",
-    minimumFractionDigits: 2,
-  });
+  try {
+    return value.toLocaleString("es-MX", {
+      style: "currency",
+      currency,
+      minimumFractionDigits: 2,
+    });
+  } catch {
+    return `${value.toLocaleString("es-MX", { minimumFractionDigits: 2 })} ${currency}`;
+  }
+}
+
+/** Moneda común si todas las partidas comparten la misma; si no, undefined. */
+function sharedDocCurrency(detalles: PolizaDetalle[]): string | undefined {
+  const codes = detalles
+    .map((d) => (typeof d.currency === "string" && d.currency.trim() ? d.currency.trim() : null))
+    .filter((c): c is string => Boolean(c));
+  if (codes.length === 0) return "MXN";
+  const uniq = [...new Set(codes)];
+  return uniq.length === 1 ? uniq[0] : undefined;
+}
+
+function formatTotalAmount(value: number, detalles: PolizaDetalle[]): string {
+  const shared = sharedDocCurrency(detalles);
+  if (shared) return formatMoney(value, shared);
+  return `${value.toLocaleString("es-MX", { minimumFractionDigits: 2 })} (varias monedas)`;
 }
 
 export default function AccountingExportPanel() {
@@ -67,7 +87,9 @@ export default function AccountingExportPanel() {
   const [toast, setToast] = useState<{
     message: string;
     type: "success" | "error" | "info" | "warning";
+    id: number;
   } | null>(null);
+  const toastIdRef = useRef(0);
   const [expandedIdx, setExpandedIdx] = useState<number | null>(null);
   const [fetched, setFetched] = useState(false);
 
@@ -115,20 +137,25 @@ export default function AccountingExportPanel() {
       setFetched(true);
 
       if ((data.polizas ?? []).length === 0) {
+        toastIdRef.current += 1;
         setToast({
           message: "No se encontraron pólizas en ese rango de fechas.",
           type: "info",
+          id: toastIdRef.current,
         });
       } else {
+        toastIdRef.current += 1;
         setToast({
           message: `${data.polizas.length} póliza(s) obtenida(s).`,
           type: "success",
+          id: toastIdRef.current,
         });
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       setError(msg);
-      setToast({ message: `Error: ${msg}`, type: "error" });
+      toastIdRef.current += 1;
+      setToast({ message: `Error: ${msg}`, type: "error", id: toastIdRef.current });
     } finally {
       setLoading(false);
     }
@@ -147,7 +174,8 @@ export default function AccountingExportPanel() {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-    setToast({ message: "Archivo JSON descargado.", type: "success" });
+    toastIdRef.current += 1;
+    setToast({ message: "Archivo JSON descargado.", type: "success", id: toastIdRef.current });
   }, [polizas, dateFrom, dateTo]);
 
   const toggleExpand = (idx: number) => {
@@ -156,7 +184,7 @@ export default function AccountingExportPanel() {
 
   return (
     <div className="space-y-6">
-      {toast && <Toast message={toast.message} type={toast.type} key={toast.message + Date.now()} />}
+      {toast && <Toast message={toast.message} type={toast.type} key={toast.id} />}
 
       {/* Filters */}
       <section className="card-editorial p-4 sm:p-5" aria-label="Filtros de exportación">
@@ -402,7 +430,7 @@ function PolizaCard({
             </p>
             <p className="text-xs text-[var(--color-ink-muted)]">
               {detalles.length} partida{detalles.length !== 1 ? "s" : ""} ·{" "}
-              Debe {formatMxn(totalDebe)} · Haber {formatMxn(totalHaber)}
+              Debe {formatTotalAmount(totalDebe, detalles)} · Haber {formatTotalAmount(totalHaber, detalles)}
             </p>
           </div>
         </div>
@@ -469,7 +497,7 @@ function PolizaCard({
                         </span>
                       </td>
                       <td className="px-3 py-2 text-right tabular-nums text-[var(--color-ink)]">
-                        {formatMxn(d.amountDocCurrency)}
+                        {formatMoney(d.amountDocCurrency, d.currency ?? "MXN")}
                       </td>
                       <td className="px-3 py-2 text-center text-[var(--color-ink-muted)]">
                         {d.currency ?? "MXN"}
@@ -494,7 +522,7 @@ function PolizaCard({
                       </span>
                     </td>
                     <td className="px-3 py-2 text-right tabular-nums font-medium text-[var(--color-ink)]">
-                      {formatMxn(totalDebe)}
+                      {formatTotalAmount(totalDebe, detalles)}
                     </td>
                     <td colSpan={3} />
                   </tr>
@@ -506,7 +534,7 @@ function PolizaCard({
                       </span>
                     </td>
                     <td className="px-3 py-2 text-right tabular-nums font-medium text-[var(--color-ink)]">
-                      {formatMxn(totalHaber)}
+                      {formatTotalAmount(totalHaber, detalles)}
                     </td>
                     <td colSpan={3} />
                   </tr>

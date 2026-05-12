@@ -111,12 +111,18 @@ export default function XmlExpenseForm({ receiptId, token, onSuccess }: Props) {
       void (async () => {
         setFxLoading(true);
         try {
-          const res = await fetch(
-            `${API_BASE}/fx/convert?from=${encodeURIComponent(intlMoneda)}&to=MXN&amount=${encodeURIComponent(String(amt))}`,
-            { credentials: "include" },
+          const qs = new URLSearchParams({
+            from: intlMoneda,
+            to: "MXN",
+            amount: String(amt),
+          });
+          const body = await apiRequest<{ data?: { converted?: number } }>(
+            `/fx/convert?${qs.toString()}`,
+            {
+              method: "GET",
+              headers: { Authorization: `Bearer ${token}` },
+            },
           );
-          if (!res.ok) throw new Error("FX");
-          const body = await res.json();
           const converted = body?.data?.converted;
           setFxMxn(typeof converted === "number" ? converted : null);
         } catch {
@@ -127,7 +133,7 @@ export default function XmlExpenseForm({ receiptId, token, onSuccess }: Props) {
       })();
     }, 400);
     return () => clearTimeout(t);
-  }, [isInternational, intlMonto, intlMoneda]);
+  }, [isInternational, intlMonto, intlMoneda, token]);
 
   const handleXmlUpload = useCallback(
     async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -179,12 +185,22 @@ export default function XmlExpenseForm({ receiptId, token, onSuccess }: Props) {
     setSubmitting(true);
     setParseError(null);
     try {
+      const fe = new Date(data.fecha_emision);
+      if (Number.isNaN(fe.getTime())) {
+        setParseError("La fecha de emisión no es válida.");
+        setSubmitting(false);
+        return;
+      }
       const base = registroSugerido ?? {};
       const merged = {
         ...base,
-        fecha_emision: new Date(data.fecha_emision).toISOString(),
+        rfc_emisor: data.rfc_emisor,
+        uuid: data.uuid,
+        fecha_emision: fe.toISOString(),
         total: data.monto_total,
         subtotal: data.monto_total,
+        receipt_type_id: data.receipt_type_id,
+        ...(data.notas?.trim() ? { notas: data.notas.trim() } : {}),
       };
       await apiRequest(`/comprobantes/${receiptId}`, {
         method: "POST",
@@ -228,6 +244,12 @@ export default function XmlExpenseForm({ receiptId, token, onSuccess }: Props) {
         throw new Error(t || "upload");
       }
 
+      const emisionIntl = new Date(`${data.fecha_emision}T12:00:00`);
+      if (Number.isNaN(emisionIntl.getTime())) {
+        setParseError("La fecha de emisión no es válida.");
+        setSubmitting(false);
+        return;
+      }
       await apiRequest(`/comprobantes/${receiptId}`, {
         method: "POST",
         data: {
@@ -235,7 +257,7 @@ export default function XmlExpenseForm({ receiptId, token, onSuccess }: Props) {
           descripcion: data.descripcion,
           total: data.monto_total,
           moneda: data.moneda,
-          fecha_emision: new Date(`${data.fecha_emision}T12:00:00`).toISOString(),
+          fecha_emision: emisionIntl.toISOString(),
           receipt_type_id: data.receipt_type_id,
           notas: data.notas || undefined,
         },
