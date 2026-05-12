@@ -145,8 +145,23 @@ export default function OnboardingImportAdmin({ orgId }: Props) {
       }
     }
     if (!g) {
-      const applyable = preview.applyableUsernames ?? preview.preview.map((u) => u.userName);
-      const missing = applyable.filter(
+      // Lista de usuarios sobre los que validar overrides individuales:
+      //  - Si el backend mandó applyableUsernames, lo usamos (cubre filas no visibles).
+      //  - Si no, solo confiamos en preview.preview cuando contiene TODOS los válidos.
+      //  - Si la tabla está truncada y no hay applyableUsernames, exigimos global.
+      let usersToCheck: string[] | null = null;
+      if (preview.applyableUsernames) {
+        usersToCheck = preview.applyableUsernames;
+      } else if (preview.preview.length >= preview.validRows) {
+        usersToCheck = preview.preview.map((u) => u.userName);
+      }
+      if (!usersToCheck) {
+        setPreviewApplyError(
+          "Define una contraseña global: la tabla solo muestra una porción y no podemos asegurar la contraseña de los usuarios no visibles."
+        );
+        return;
+      }
+      const missing = usersToCheck.filter(
         (un) => !(passwordOverridesByUser[un] ?? "").trim()
       );
       if (missing.length > 0) {
