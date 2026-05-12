@@ -1,0 +1,34 @@
+---
+/**
+ * /reportes/gastos-por-centro — Dashboard de gasto acumulado por centro
+ * de costos (M3-009). Consume GET /reports/expenses-by-cc del backend y
+ * cae a datos de muestra mientras el endpoint se libera. La actualización
+ * en tiempo real corre del lado del cliente (polling).
+ */
+
+import EditorialHeader from "@components/EditorialHeader.astro";
+import MainLayout from "@layouts/MainLayout.astro";
+import ExpensesDashboard from "@components/ExpensesDashboard";
+import { getCookie } from "@data/cookies";
+import { roleLabels } from "@config/role-labels";
+import type { UserRole } from "@type/roles";
+
+const role: UserRole = getCookie("role", Astro.cookies) as UserRole;
+const buttonLabel = roleLabels[role];
+const userName = getCookie("username", Astro.cookies);
+const token = getCookie("token", Astro.cookies);
+---
+
+<MainLayout
+  title="Gasto por centro de costos"
+  data={{ userName, buttonLabel, role }}
+>
+  <div>
+    <EditorialHeader
+      eyebrow="Coco / Reportes / Gasto por CC"
+      title="Gasto por centro de costos"
+      subtitle="Visualiza el gasto acumulado por periodo, identifica los CCs cerca de su presupuesto y filtra por tipo y estatus."
+    />
+    <ExpensesDashboard client:only="react" token={token} />
+  </div>
+</MainLayout>
