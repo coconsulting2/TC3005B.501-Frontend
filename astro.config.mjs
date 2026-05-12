@@ -23,6 +23,11 @@ export default defineConfig({
     // ("closed without opened"). Desactivar HMR evita ruido en consola; recarga manual.
     server: {
       hmr: false,
+      // Force vite onto node:https (HTTP/1.1) instead of node:http2 — Bun's http2
+      // polyfill crashes with "null is not an object (evaluating 'prop')" when
+      // accessing incomingRequest.socket. An empty proxy object trips the
+      // `if (proxy)` branch in vite's server factory without proxying anything.
+      proxy: {},
     },
   },
   env: {
