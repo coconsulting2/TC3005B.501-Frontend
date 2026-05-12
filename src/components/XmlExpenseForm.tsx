@@ -7,7 +7,7 @@
  **/
 
 import { useState, useCallback, useEffect } from "react";
-import { useForm, type SubmitHandler } from "react-hook-form";
+import { useForm, type Resolver, type SubmitHandler } from "react-hook-form";
 import { z } from "zod";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { apiRequest } from "@utils/apiClient";
@@ -71,7 +71,7 @@ export default function XmlExpenseForm({ receiptId, token, onSuccess }: Props) {
   const [fxLoading, setFxLoading] = useState(false);
 
   const nationalForm = useForm<ExpenseFormData>({
-    resolver: zodResolver(expenseSchema),
+    resolver: zodResolver(expenseSchema) as Resolver<ExpenseFormData>,
     defaultValues: {
       rfc_emisor: "",
       fecha_emision: "",
@@ -83,7 +83,7 @@ export default function XmlExpenseForm({ receiptId, token, onSuccess }: Props) {
   });
 
   const intlForm = useForm<InternationalFormData>({
-    resolver: zodResolver(internationalSchema),
+    resolver: zodResolver(internationalSchema) as Resolver<InternationalFormData>,
     defaultValues: {
       descripcion: "",
       fecha_emision: new Date().toISOString().slice(0, 10),
