@@ -53,6 +53,8 @@ const T = {
   infoBg: "var(--color-primary-50)",
   infoBorder: "var(--color-primary-200)",
   scrim: "rgba(10, 10, 10, 0.42)",
+  /** Referencia técnica (código permiso): legible sobre fondo claro */
+  technicalRef: "var(--color-primary-800, #2a3820)",
 } as const;
 
 interface Props {
@@ -295,27 +297,52 @@ export default function OnboardingImportAdmin({ orgId }: Props) {
           <div
             style={{
               marginBottom: 16,
-              padding: "12px 14px",
-              borderRadius: 8,
+              padding: "16px 18px",
+              borderRadius: 10,
               border: `1px solid ${T.borderSoft}`,
               background: T.surfaceMuted,
-              fontSize: 13,
-              color: T.inkSecondary,
+              fontSize: 16,
+              lineHeight: 1.45,
+              color: T.ink,
             }}
           >
-            <label style={{ display: "flex", gap: 10, alignItems: "flex-start", cursor: impersonatedOrgId ? "not-allowed" : "pointer" }}>
+            <label
+              style={{
+                display: "flex",
+                gap: 14,
+                alignItems: "flex-start",
+                cursor: impersonatedOrgId ? "not-allowed" : "pointer",
+              }}
+            >
               <input
                 type="checkbox"
                 checked={createNewOrgOption}
                 disabled={Boolean(impersonatedOrgId)}
                 onChange={(e) => setCreateNewOrgOption(e.target.checked)}
-                style={{ marginTop: 2 }}
+                style={{
+                  marginTop: 4,
+                  width: 24,
+                  height: 24,
+                  minWidth: 24,
+                  minHeight: 24,
+                  flexShrink: 0,
+                  cursor: impersonatedOrgId ? "not-allowed" : "pointer",
+                  accentColor: T.primary,
+                }}
               />
-              <span>
-                <strong>Crear organización nueva</strong> al importar (solo JSON con bloque{" "}
-                <code style={{ fontSize: 12 }}>organization</code> + usuarios). Requiere permiso de crear organizaciones.
+              <span style={{ fontSize: 16, color: T.ink }}>
+                <strong style={{ fontSize: 18, display: "block", marginBottom: 6 }}>
+                  Crear organización nueva
+                </strong>
+                Al importar (solo JSON con bloque{" "}
+                <code style={{ fontSize: 14, padding: "2px 6px", background: T.surfaceTertiary, borderRadius: 4 }}>
+                  organization
+                </code>{" "}
+                + usuarios). Requiere permiso de crear organizaciones.
                 {impersonatedOrgId ? (
-                  <> Sal de la <strong>impersonación</strong> de otra org antes de marcar esta opción.</>
+                  <span style={{ display: "block", marginTop: 8, fontSize: 15, color: T.inkSecondary }}>
+                    Sal de la <strong>impersonación</strong> de otra org antes de marcar esta opción.
+                  </span>
                 ) : null}
               </span>
             </label>
@@ -498,6 +525,8 @@ function PreviewPanel({
   onReset: () => void;
 }) {
   const [extrasModalUser, setExtrasModalUser] = useState<string | null>(null);
+  const [showGlobalPassword, setShowGlobalPassword] = useState(false);
+  const [passwordPeekByUser, setPasswordPeekByUser] = useState<Record<string, boolean>>({});
 
   const catalog = preview.permissionsCatalog;
   const applyableTotal = preview.applyableUsernames?.length ?? preview.validRows;
@@ -652,22 +681,47 @@ function PreviewPanel({
             <span style={{ display: "block", fontSize: 12, fontWeight: 600, color: T.inkSecondary, marginBottom: 4 }}>
               Misma contraseña para todo el lote
             </span>
-            <input
-              type="password"
-              autoComplete="new-password"
-              value={globalPassword}
-              onChange={(e) => onGlobalPasswordChange(e.target.value)}
-              placeholder="Define una contraseña común para todos…"
-              style={{
-                width: "100%",
-                maxWidth: 360,
-                padding: "8px 10px",
-                borderRadius: 6,
-                border: `1px solid ${T.border}`,
-                fontSize: 13,
-                background: T.surface,
-              }}
-            />
+            <div style={{ position: "relative", width: "100%", maxWidth: 380 }}>
+              <input
+                type={showGlobalPassword ? "text" : "password"}
+                autoComplete="new-password"
+                value={globalPassword}
+                onChange={(e) => onGlobalPasswordChange(e.target.value)}
+                placeholder="Define una contraseña común para todos…"
+                style={{
+                  width: "100%",
+                  boxSizing: "border-box",
+                  padding: "10px 44px 10px 12px",
+                  borderRadius: 8,
+                  border: `1px solid ${T.border}`,
+                  fontSize: 15,
+                  background: T.surface,
+                }}
+              />
+              <button
+                type="button"
+                aria-label={showGlobalPassword ? "Ocultar contraseña" : "Mostrar contraseña"}
+                onClick={() => setShowGlobalPassword((v) => !v)}
+                style={{
+                  position: "absolute",
+                  right: 4,
+                  top: "50%",
+                  transform: "translateY(-50%)",
+                  border: "none",
+                  background: "transparent",
+                  cursor: "pointer",
+                  padding: 6,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  color: T.inkSecondary,
+                }}
+              >
+                <span className="material-symbols-outlined" style={{ fontSize: 24 }}>
+                  {showGlobalPassword ? "visibility_off" : "visibility"}
+                </span>
+              </button>
+            </div>
           </label>
           {applyableTotal > preview.preview.length ? (
             <p style={{ margin: 0, fontSize: 12, color: T.inkMuted }}>
@@ -853,23 +907,54 @@ function PreviewPanel({
                       <td style={tdStyle}>{u.userName}</td>
                       <td style={tdStyle}>{u.email}</td>
                       <td style={tdStyle}>
-                        <input
-                          type="password"
-                          autoComplete="new-password"
-                          value={passwordOverridesByUser[u.userName] ?? ""}
-                          onChange={(e) => onPasswordOverrideChange(u.userName, e.target.value)}
-                          placeholder="Vacío: archivo o global"
-                          style={{
-                            width: "100%",
-                            minWidth: 140,
-                            maxWidth: 200,
-                            padding: "6px 8px",
-                            borderRadius: 6,
-                            border: `1px solid ${T.border}`,
-                            fontSize: 12,
-                            background: T.surface,
-                          }}
-                        />
+                        <div style={{ position: "relative", width: "100%", minWidth: 160, maxWidth: 220 }}>
+                          <input
+                            type={passwordPeekByUser[u.userName] ? "text" : "password"}
+                            autoComplete="new-password"
+                            value={passwordOverridesByUser[u.userName] ?? ""}
+                            onChange={(e) => onPasswordOverrideChange(u.userName, e.target.value)}
+                            placeholder="Si vacío, usa la global"
+                            style={{
+                              width: "100%",
+                              boxSizing: "border-box",
+                              padding: "8px 40px 8px 10px",
+                              borderRadius: 8,
+                              border: `1px solid ${T.border}`,
+                              fontSize: 14,
+                              background: T.surface,
+                            }}
+                          />
+                          <button
+                            type="button"
+                            aria-label={
+                              passwordPeekByUser[u.userName]
+                                ? "Ocultar contraseña"
+                                : "Mostrar contraseña"
+                            }
+                            onClick={() =>
+                              setPasswordPeekByUser((prev) => ({
+                                ...prev,
+                                [u.userName]: !prev[u.userName],
+                              }))
+                            }
+                            style={{
+                              position: "absolute",
+                              right: 2,
+                              top: "50%",
+                              transform: "translateY(-50%)",
+                              border: "none",
+                              background: "transparent",
+                              cursor: "pointer",
+                              padding: 4,
+                              display: "flex",
+                              color: T.inkSecondary,
+                            }}
+                          >
+                            <span className="material-symbols-outlined" style={{ fontSize: 22 }}>
+                              {passwordPeekByUser[u.userName] ? "visibility_off" : "visibility"}
+                            </span>
+                          </button>
+                        </div>
                       </td>
                       <td style={tdStyle}>
                         <RolePermissionsCell
@@ -1317,13 +1402,13 @@ function PermissionExtrasModal({
             background: T.surfaceMuted,
           }}
         >
-          <h3 id="perm-modal-title" style={{ margin: 0, fontSize: 17, color: T.ink }}>
-            Permisos — {row.userName}
+          <h3 id="perm-modal-title" style={{ margin: 0, fontSize: 18, color: T.ink }}>
+            Permisos por persona — {row.userName}
           </h3>
-          <p style={{ margin: "8px 0 0", fontSize: 13, color: T.inkSecondary, lineHeight: 1.45 }}>
-            Rol: <strong style={{ color: T.ink }}>{row.roleName}</strong>. Cada permiso se explica
-            en lenguaje claro; el código técnico (p. ej. <code style={{ fontSize: 11, color: T.inkMuted }}>user:create</code>)
-            solo aparece como referencia. Las casillas{" "}
+          <p style={{ margin: "8px 0 0", fontSize: 14, color: T.inkSecondary, lineHeight: 1.5 }}>
+            Rol: <strong style={{ color: T.ink }}>{row.roleName}</strong>. Las secciones agrupan por área
+            (p. ej. <strong>Contabilidad (Accounting)</strong>, Usuarios, Comprobantes…). Cada permiso está en
+            español; debajo verás la <strong>referencia técnica</strong> del código. Las casillas{" "}
             <span style={{ color: T.primary, fontWeight: 600 }}>del rol</span> no se pueden quitar aquí. Marca los
             adicionales que quieras dar solo a esta persona.
           </p>
@@ -1398,11 +1483,13 @@ function PermissionExtrasModal({
                           <span
                             style={{
                               display: "block",
-                              marginTop: 4,
-                              fontSize: 11,
-                              color: T.inkMuted,
+                              marginTop: 6,
+                              fontSize: 12,
+                              fontWeight: 600,
+                              color: T.technicalRef,
                               fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
                               wordBreak: "break-all",
+                              letterSpacing: "0.02em",
                             }}
                           >
                             Referencia técnica: {item.code}
