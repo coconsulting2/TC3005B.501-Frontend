@@ -9,8 +9,21 @@
  */
 
 import { http, HttpResponse } from "msw";
+import { PERMISSIONS_CATALOG } from "../../../src/config/permissionsCatalog";
 
 const API = "https://localhost:3000/api";
+
+let mockPermissionIdSeq = 1;
+const MOCK_PERMISSION_ROWS = PERMISSIONS_CATALOG.flatMap((module) =>
+  module.permissions.map((p) => ({
+    permissionId: mockPermissionIdSeq++,
+    code: p.code,
+    resource: module.key,
+    action: "action",
+    description: p.label,
+    active: true,
+  })),
+);
 
 export const handlers = [
   http.get(`${API}/user/csrf-token`, () => {
@@ -86,12 +99,16 @@ export const handlers = [
     return HttpResponse.json({ ok: true });
   }),
 
+  http.get(`${API}/admin/permissions`, () => {
+    return HttpResponse.json(MOCK_PERMISSION_ROWS);
+  }),
+
   http.get(`${API}/admin/roles`, () => {
     return HttpResponse.json([
       {
         role_id: 1,
         name: "Administrador",
-        permissions: ["admin.roles.gestionar"],
+        permissions: ["role:manage_permissions"],
         max_authorization_amount: null,
         expiration_date: null,
         is_admin: true,
@@ -114,6 +131,10 @@ export const handlers = [
 
   http.put(`${API}/admin/roles/:id`, () => {
     return HttpResponse.json({ ok: true });
+  }),
+
+  http.delete(`${API}/admin/roles/:id`, () => {
+    return new HttpResponse(null, { status: 204 });
   }),
 
   http.post(`${API}/workflow/simulate`, () => {

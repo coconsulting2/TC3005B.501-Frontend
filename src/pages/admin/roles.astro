@@ -24,6 +24,6 @@ const token = getCookie("token", Astro.cookies);
       title="Roles y permisos"
       subtitle="Define roles, asigna permisos por módulo y controla el monto máximo de autorización."
     />
-    <RolesAdmin client:only="react" token={token} />
+    <RolesAdmin client:only="react" token={token} apiEndpoint="/admin/roles" />
   </div>
 </MainLayout>

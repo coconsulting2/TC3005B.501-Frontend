@@ -27,6 +27,7 @@ const { request, canAuthorize } = Astro.props;
 
 /** Backend: PUT .../authorize-travel-request — user_id debe ser el del autorizador en sesión. */
 const authorizerUserId = getCookie("id", Astro.cookies);
+const sessionToken = getCookie("token", Astro.cookies);
 const id = request.request_id;
 
 const canAct = canAuthorize;
@@ -45,6 +46,8 @@ const history = Array.isArray(request?.status_history)
       request={request}
       title={`SOLICITUD #${request.request_id}`}
       subtitle="Detalles de la solicitud"
+      currentUserId={authorizerUserId ? parseInt(String(authorizerUserId), 10) : undefined}
+      authToken={sessionToken}
     />
 
     <RequestComprobantesSection receipts={receipts} />
