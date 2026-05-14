@@ -807,7 +807,7 @@ function PreviewPanel({
           }}
         >
           <summary style={{ cursor: "pointer", fontWeight: 600, color: T.ink }}>
-            Roles en esta organización ({preview.rolesCatalog.length}) — permisos por rol
+            Roles en esta organización ({preview.rolesCatalog.length}) — permisos efectivos por rol (incluye base de solicitante)
           </summary>
           <ul style={{ margin: "12px 0 0", paddingLeft: 18, listStyle: "disc" }}>
             {preview.rolesCatalog.map((rc) => (
@@ -1253,7 +1253,7 @@ function RolePermissionsCell({
         <>
           <div style={{ fontWeight: 600, color: T.ink }}>{row.roleName ?? "—"}</div>
           <p style={{ margin: "6px 0 4px", fontSize: 12, color: T.inkMuted }}>
-            {nRole} permiso{nRole !== 1 ? "s" : ""} desde el rol
+            {nRole} permiso{nRole !== 1 ? "s" : ""} efectivos (rol + base solicitante del sistema)
             {extraCount > 0 ? (
               <span style={{ color: T.primary, fontWeight: 600 }}>
                 {" "}

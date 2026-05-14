@@ -11,6 +11,8 @@ export interface Role {
   expiration_date: string | null;
   is_admin: boolean;
   active_users_count: number;
+  /** Rol sembrado por bootstrap (N1, Solicitante, …): no renombrar ni reasignar permisos desde esta UI. */
+  is_system?: boolean;
 }
 
 export type RoleCreatePayload = Omit<Role, "role_id" | "active_users_count">;

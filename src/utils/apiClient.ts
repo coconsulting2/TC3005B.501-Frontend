@@ -27,7 +27,7 @@ const DEFAULT_API = "https://localhost:3000/api";
  * URL base del API. En el navegador: PUBLIC_API_BASE_URL (localhost).
  * En SSR dentro de Docker: `API_URL_SSR` apunta al backend en el host (p. ej. host.docker.internal).
  */
-function resolveApiBaseUrl(): string {
+export function resolveApiBaseUrl(): string {
   const isBrowser = typeof window !== "undefined";
   if (!isBrowser && typeof process !== "undefined" && process.env.API_URL_SSR) {
     return String(process.env.API_URL_SSR).replace(/\/$/, "");
@@ -154,7 +154,14 @@ export async function apiRequest<T = any>(
       };
     }
 
-    return await res.json();
+    if (res.status === 204) {
+      return undefined as T;
+    }
+    const text = await res.text();
+    if (!text) {
+      return undefined as T;
+    }
+    return JSON.parse(text) as T;
   } catch (error) {
     console.error("API request failed:", error);
     if (

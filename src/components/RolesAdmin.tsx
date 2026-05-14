@@ -1,10 +1,7 @@
 /**
- * RolesAdmin — CRUD for roles and permissions (M2-003).
- * Validates that at least one admin role always exists and warns before
- * deleting a role that has active users.
- *
- * Currently runs on local seed data; pass `apiEndpoint` to wire to the
- * real backend once M2-00x ships.
+ * RolesAdmin — CRUD de roles y permisos por organización.
+ * Con `apiEndpoint` usa GET/POST/PUT/DELETE `/api/admin/roles` y el catálogo
+ * `/api/admin/permissions` para nombres de jefatura personalizados (N4, regional, etc.).
  */
 
 import { useEffect, useMemo, useState } from "react";
@@ -19,8 +16,47 @@ import {
   ALL_PERMISSION_CODES,
   PERMISSIONS_CATALOG,
 } from "@config/permissionsCatalog";
+import type { PermissionModule } from "@config/permissionsCatalog";
 import type { Role } from "@type/Role";
 import { apiRequest } from "@utils/apiClient";
+
+function getApiErrorMessage(err: unknown): string {
+  if (err && typeof err === "object" && "detail" in err) {
+    const detail = (err as { detail?: { response?: { error?: string } } }).detail;
+    const msg = detail?.response?.error;
+    if (msg) return String(msg);
+  }
+  return "Error al comunicarse con el servidor";
+}
+
+type ApiPermissionRow = {
+  code: string;
+  resource: string;
+  description?: string | null;
+};
+
+function buildModulesFromApi(rows: ApiPermissionRow[]): PermissionModule[] {
+  if (!rows.length) return PERMISSIONS_CATALOG;
+  const by = new Map<string, ApiPermissionRow[]>();
+  for (const p of rows) {
+    const k = p.resource?.trim() || "other";
+    const list = by.get(k) ?? [];
+    list.push(p);
+    by.set(k, list);
+  }
+  return [...by.entries()]
+    .sort(([a], [b]) => a.localeCompare(b))
+    .map(([resource, perms]) => ({
+      key: resource,
+      label: resource,
+      permissions: [...perms]
+        .sort((a, b) => a.code.localeCompare(b.code))
+        .map((p) => ({
+          code: p.code,
+          label: (p.description && p.description.trim()) || p.code,
+        })),
+    }));
+}
 
 const SEED_ROLES: Role[] = [
   {
@@ -85,7 +121,7 @@ const roleSchema = z
       .string()
       .trim()
       .min(2, "El nombre debe tener al menos 2 caracteres")
-      .max(50, "Máximo 50 caracteres"),
+      .max(40, "Máximo 40 caracteres (límite de la base de datos)"),
     permissions: z.array(z.string()),
     max_authorization_amount: z.union([
       z.number().min(0, "No puede ser negativo"),
@@ -95,7 +131,7 @@ const roleSchema = z
     is_admin: z.boolean(),
   })
   .refine((data) => !data.is_admin || data.permissions.includes(ADMIN_PERMISSION_CODE), {
-    message: "Un rol admin debe incluir el permiso 'Gestionar roles y permisos'",
+    message: "Un rol admin debe incluir el permiso «Gestionar roles y permisos» (role:manage_permissions)",
     path: ["permissions"],
   });
 
@@ -109,7 +145,10 @@ type Dialog =
 
 interface RolesAdminProps {
   initialData?: Role[];
+  /** Ej. `/admin/roles` (base ya incluye `/api`). */
   apiEndpoint?: string;
+  /** Catálogo para los checkboxes; por defecto permisos activos del API. */
+  permissionsCatalogEndpoint?: string;
   token?: string;
 }
 
@@ -124,9 +163,15 @@ const defaultFormValues: RoleFormValues = {
 export default function RolesAdmin({
   initialData,
   apiEndpoint,
+  permissionsCatalogEndpoint = "/admin/permissions?active_only=true",
   token,
 }: RolesAdminProps) {
-  const [roles, setRoles] = useState<Role[]>(initialData ?? SEED_ROLES);
+  const [roles, setRoles] = useState<Role[]>(() =>
+    apiEndpoint ? initialData ?? [] : initialData ?? SEED_ROLES,
+  );
+  const [permissionModules, setPermissionModules] = useState<PermissionModule[]>(() =>
+    apiEndpoint ? [] : PERMISSIONS_CATALOG,
+  );
   const [dialog, setDialog] = useState<Dialog>({ kind: "closed" });
   const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState<{
@@ -150,28 +195,58 @@ export default function RolesAdmin({
   const selectedPermissions = watch("permissions") ?? [];
   const isAdminWatched = watch("is_admin");
 
+  const allPermissionCodes = useMemo(() => {
+    const codes = permissionModules.flatMap((m) => m.permissions.map((p) => p.code));
+    return codes.length ? codes : ALL_PERMISSION_CODES;
+  }, [permissionModules]);
+
   useEffect(() => {
-    if (!apiEndpoint) return;
+    if (!apiEndpoint) {
+      setPermissionModules(PERMISSIONS_CATALOG);
+      return;
+    }
     let cancelled = false;
+    const headers = token ? { Authorization: `Bearer ${token}` } : undefined;
     (async () => {
       try {
-        const data = await apiRequest<Role[]>(apiEndpoint, {
-          headers: token ? { Authorization: `Bearer ${token}` } : undefined,
-        });
-        if (!cancelled && Array.isArray(data)) setRoles(data);
+        const permPath =
+          permissionsCatalogEndpoint && permissionsCatalogEndpoint.includes("?")
+            ? permissionsCatalogEndpoint
+            : `${permissionsCatalogEndpoint ?? "/admin/permissions"}?active_only=true`;
+        const [rolesData, permData] = await Promise.all([
+          apiRequest<Role[]>(apiEndpoint, { headers }),
+          apiRequest<ApiPermissionRow[]>(permPath, { headers }),
+        ]);
+        if (cancelled) return;
+        if (Array.isArray(rolesData)) setRoles(rolesData);
+        if (Array.isArray(permData) && permData.length > 0) {
+          setPermissionModules(buildModulesFromApi(permData));
+        } else {
+          setPermissionModules(PERMISSIONS_CATALOG);
+        }
       } catch (err) {
-        console.warn("[RolesAdmin] fetch failed, using seed data", err);
+        console.warn("[RolesAdmin] fetch failed", err);
+        if (!cancelled) {
+          setPermissionModules(PERMISSIONS_CATALOG);
+          setToast({
+            type: "warning",
+            message:
+              "No se pudieron cargar roles o permisos desde el servidor. Revisa tu sesión y que tengas permiso de gestión de roles.",
+          });
+        }
       }
     })();
     return () => {
       cancelled = true;
     };
-  }, [apiEndpoint, token]);
+  }, [apiEndpoint, permissionsCatalogEndpoint, token]);
 
   const adminCount = useMemo(
     () => roles.filter((r) => r.is_admin).length,
     [roles]
   );
+
+  const editingSystem = dialog.kind === "edit" && !!dialog.role.is_system;
 
   const openCreate = () => {
     reset(defaultFormValues);
@@ -196,6 +271,7 @@ export default function RolesAdmin({
   };
 
   const togglePermission = (code: string) => {
+    if (editingSystem) return;
     const current = selectedPermissions;
     const next = current.includes(code)
       ? current.filter((c) => c !== code)
@@ -204,6 +280,7 @@ export default function RolesAdmin({
   };
 
   const toggleModule = (moduleCodes: string[]) => {
+    if (editingSystem) return;
     const current = new Set(selectedPermissions);
     const allSelected = moduleCodes.every((c) => current.has(c));
     if (allSelected) {
@@ -231,6 +308,36 @@ export default function RolesAdmin({
           : null,
       is_admin: values.is_admin,
     };
+
+    if (dialog.kind === "edit" && dialog.role.is_system) {
+      setSubmitting(true);
+      try {
+        if (apiEndpoint) {
+          const updated = await apiRequest<Role>(`${apiEndpoint}/${dialog.role.role_id}`, {
+            method: "PUT",
+            data: {
+              max_authorization_amount: parsed.max_authorization_amount,
+            },
+            headers: token ? { Authorization: `Bearer ${token}` } : undefined,
+          });
+          setRoles((prev) => prev.map((r) => (r.role_id === updated.role_id ? updated : r)));
+        } else {
+          setRoles((prev) =>
+            prev.map((r) =>
+              r.role_id === dialog.role.role_id
+                ? { ...r, max_authorization_amount: parsed.max_authorization_amount ?? null }
+                : r
+            )
+          );
+        }
+        setToast({ message: "Rol actualizado", type: "success" });
+        closeDialog();
+      } catch (err) {
+        setToast({ message: getApiErrorMessage(err), type: "error" });
+        setSubmitting(false);
+      }
+      return;
+    }
 
     if (dialog.kind === "edit" && dialog.role.is_admin && !parsed.is_admin) {
       if (adminCount <= 1) {
@@ -261,7 +368,9 @@ export default function RolesAdmin({
               headers: token ? { Authorization: `Bearer ${token}` } : undefined,
             });
           } catch (err) {
-            console.warn("[RolesAdmin] create failed, using local state", err);
+            setToast({ message: getApiErrorMessage(err), type: "error" });
+            setSubmitting(false);
+            return;
           }
         }
         const nextId =
@@ -272,6 +381,7 @@ export default function RolesAdmin({
           created ?? {
             role_id: nextId,
             active_users_count: 0,
+            is_system: false,
             ...payload,
           },
         ]);
@@ -286,20 +396,24 @@ export default function RolesAdmin({
         };
         if (apiEndpoint) {
           try {
-            await apiRequest(`${apiEndpoint}/${dialog.role.role_id}`, {
+            const updated = await apiRequest<Role>(`${apiEndpoint}/${dialog.role.role_id}`, {
               method: "PUT",
               data: payload,
               headers: token ? { Authorization: `Bearer ${token}` } : undefined,
             });
+            setRoles((prev) => prev.map((r) => (r.role_id === dialog.role.role_id ? updated : r)));
           } catch (err) {
-            console.warn("[RolesAdmin] update failed, using local state", err);
+            setToast({ message: getApiErrorMessage(err), type: "error" });
+            setSubmitting(false);
+            return;
           }
+        } else {
+          setRoles((prev) =>
+            prev.map((r) =>
+              r.role_id === dialog.role.role_id ? { ...r, ...payload } : r
+            )
+          );
         }
-        setRoles((prev) =>
-          prev.map((r) =>
-            r.role_id === dialog.role.role_id ? { ...r, ...payload } : r
-          )
-        );
         setToast({ message: "Rol actualizado", type: "success" });
       }
       closeDialog();
@@ -314,6 +428,15 @@ export default function RolesAdmin({
     if (dialog.kind !== "delete") return;
     const role = dialog.role;
 
+    if (role.is_system) {
+      setToast({
+        message: "No se pueden eliminar roles de sistema (N1, Solicitante, Administrador, etc.).",
+        type: "error",
+      });
+      closeDialog();
+      return;
+    }
+
     if (role.is_admin && adminCount <= 1) {
       setToast({
         message: "No puedes eliminar el último rol administrador del sistema.",
@@ -327,12 +450,14 @@ export default function RolesAdmin({
     if (apiEndpoint) {
       try {
         await apiRequest(`${apiEndpoint}/${role.role_id}`, {
-          method: "PUT",
-          data: { active: false },
+          method: "DELETE",
           headers: token ? { Authorization: `Bearer ${token}` } : undefined,
         });
       } catch (err) {
-        console.warn("[RolesAdmin] delete failed, using local state", err);
+        setToast({ message: getApiErrorMessage(err), type: "error" });
+        setSubmitting(false);
+        closeDialog();
+        return;
       }
     }
     setRoles((prev) => prev.filter((r) => r.role_id !== role.role_id));
@@ -347,6 +472,7 @@ export default function RolesAdmin({
   const deletingHasUsers = !!deletingRole && deletingRole.active_users_count > 0;
   const deletingIsLastAdmin =
     !!deletingRole && deletingRole.is_admin && adminCount <= 1;
+  const deletingIsSystem = !!deletingRole?.is_system;
 
   const dialogTitle =
     dialog.kind === "create"
@@ -358,14 +484,16 @@ export default function RolesAdmin({
       : "";
 
   const deleteMessage = deletingRole
-    ? deletingIsLastAdmin
+    ? deletingIsSystem
+      ? `El rol "${deletingRole.name}" es de sistema y no se puede eliminar.`
+      : deletingIsLastAdmin
       ? `No se puede eliminar "${deletingRole.name}" porque es el último rol administrador del sistema.`
       : deletingHasUsers
       ? `El rol "${deletingRole.name}" tiene ${deletingRole.active_users_count} usuario${
           deletingRole.active_users_count === 1 ? "" : "s"
         } activo${
           deletingRole.active_users_count === 1 ? "" : "s"
-        }. Si continúas, esos usuarios quedarán sin rol asignado. ¿Deseas continuar?`
+        }. Reasígnalos antes de eliminar el rol.`
       : `¿Confirmas eliminar el rol "${deletingRole.name}"? Esta acción no se puede deshacer.`
     : "";
 
@@ -430,10 +558,15 @@ export default function RolesAdmin({
                               Admin
                             </span>
                           )}
+                          {role.is_system && (
+                            <span className="status-pill bg-[var(--color-neutral-200)] text-[var(--color-ink-secondary)]">
+                              Sistema
+                            </span>
+                          )}
                         </div>
                       </td>
                       <td className="px-6 py-4 text-sm text-[var(--color-ink-muted)] hidden md:table-cell tabular-nums">
-                        {role.permissions.length} / {ALL_PERMISSION_CODES.length}
+                        {role.permissions.length} / {allPermissionCodes.length}
                       </td>
                       <td className="px-6 py-4 text-sm hidden sm:table-cell money-display">
                         {role.max_authorization_amount == null
@@ -459,7 +592,12 @@ export default function RolesAdmin({
                           <button
                             type="button"
                             onClick={() => setDialog({ kind: "delete", role })}
-                            className="text-sm text-accent-400 hover:text-accent-300 transition-colors font-medium cursor-pointer"
+                            disabled={role.is_system}
+                            className={`text-sm font-medium transition-colors ${
+                              role.is_system
+                                ? "text-[var(--color-ink-muted)] cursor-not-allowed"
+                                : "text-accent-400 hover:text-accent-300 cursor-pointer"
+                            }`}
                           >
                             Eliminar
                           </button>
@@ -483,7 +621,7 @@ export default function RolesAdmin({
         onConfirm={
           isFormDialog
             ? handleSubmit(onSubmit)
-            : deletingIsLastAdmin
+            : deletingIsLastAdmin || deletingIsSystem
             ? undefined
             : handleDelete
         }
@@ -491,12 +629,14 @@ export default function RolesAdmin({
           submitting
             ? "Guardando..."
             : dialog.kind === "delete"
-            ? "Eliminar de todos modos"
+            ? deletingIsLastAdmin || deletingIsSystem
+              ? "Cerrar"
+              : "Eliminar"
             : dialog.kind === "edit"
             ? "Actualizar"
             : "Crear rol"
         }
-        cancelLabel={dialog.kind === "delete" && deletingIsLastAdmin ? "Cerrar" : "Cancelar"}
+        cancelLabel={dialog.kind === "delete" && (deletingIsLastAdmin || deletingIsSystem) ? "Cerrar" : "Cancelar"}
       >
         {isFormDialog && (
           <form className="space-y-5" onSubmit={handleSubmit(onSubmit)}>
@@ -507,7 +647,8 @@ export default function RolesAdmin({
               <input
                 type="text"
                 {...register("name")}
-                placeholder="Ej: Autorizador Regional"
+                disabled={editingSystem}
+                placeholder="Ej: Autorizador regional, N4, Director de área"
                 className={`w-full border rounded-[var(--radius-md)] px-3 py-2.5 text-sm bg-[var(--color-surface-white)] text-[var(--color-ink)] focus:outline-none focus:ring-2 focus:ring-primary-200 focus:border-primary-400 transition-colors ${
                   errors.name
                     ? "border-accent-400"
@@ -518,6 +659,12 @@ export default function RolesAdmin({
               {errors.name && (
                 <p className="text-accent-400 text-xs mt-1">
                   {errors.name.message}
+                </p>
+              )}
+              {editingSystem && (
+                <p className="text-xs text-[var(--color-ink-muted)] mt-1">
+                  Rol de catálogo de la organización: solo puedes cambiar el monto máximo de
+                  autorización; nombre y permisos vienen de grupos predefinidos.
                 </p>
               )}
             </div>
@@ -568,6 +715,7 @@ export default function RolesAdmin({
                 </label>
                 <input
                   type="date"
+                  disabled={editingSystem}
                   {...register("expiration_date")}
                   className={`w-full border rounded-[var(--radius-md)] px-3 py-2.5 text-sm bg-[var(--color-surface-white)] text-[var(--color-ink)] focus:outline-none focus:ring-2 focus:ring-primary-200 focus:border-primary-400 transition-colors ${
                     errors.expiration_date
@@ -586,6 +734,7 @@ export default function RolesAdmin({
             <label className="flex items-start gap-2 cursor-pointer select-none">
               <input
                 type="checkbox"
+                disabled={editingSystem || (!!editingRole?.is_admin && adminCount <= 1)}
                 {...register("is_admin")}
                 className="mt-1 accent-[var(--color-primary-500,#3D4A2A)]"
               />
@@ -604,7 +753,7 @@ export default function RolesAdmin({
                 <label className="block text-sm font-medium text-[var(--color-ink-secondary)]">
                   Permisos{" "}
                   <span className="text-[var(--color-ink-muted)]">
-                    ({selectedPermissions.length}/{ALL_PERMISSION_CODES.length})
+                    ({selectedPermissions.length}/{allPermissionCodes.length})
                   </span>
                 </label>
                 {errors.permissions && typeof errors.permissions.message === "string" && (
@@ -615,7 +764,7 @@ export default function RolesAdmin({
               </div>
 
               <div className="border border-[var(--color-neutral-200)] rounded-[var(--radius-md)] divide-y divide-[var(--color-neutral-200)] max-h-72 overflow-y-auto">
-                {PERMISSIONS_CATALOG.map((module) => {
+                {permissionModules.map((module) => {
                   const moduleCodes = module.permissions.map((p) => p.code);
                   const selectedInModule = moduleCodes.filter((c) =>
                     selectedPermissions.includes(c)
@@ -633,8 +782,9 @@ export default function RolesAdmin({
                         </div>
                         <button
                           type="button"
+                          disabled={editingSystem}
                           onClick={() => toggleModule(moduleCodes)}
-                          className="text-xs text-primary-500 hover:text-primary-400 font-medium cursor-pointer"
+                          className="text-xs text-primary-500 hover:text-primary-400 font-medium cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed"
                         >
                           {allSelected ? "Quitar todos" : "Seleccionar todos"}
                         </button>
@@ -652,7 +802,7 @@ export default function RolesAdmin({
                                 type="checkbox"
                                 checked={checked}
                                 onChange={() => togglePermission(perm.code)}
-                                disabled={isAdminWatched && isAdminCode}
+                                disabled={editingSystem || (isAdminWatched && isAdminCode)}
                                 className="mt-1 accent-[var(--color-primary-500,#3D4A2A)]"
                               />
                               <span className="text-[var(--color-ink)]">
@@ -675,7 +825,7 @@ export default function RolesAdmin({
           </form>
         )}
 
-        {dialog.kind === "delete" && deletingHasUsers && !deletingIsLastAdmin && (
+        {dialog.kind === "delete" && deletingHasUsers && !deletingIsLastAdmin && !deletingIsSystem && (
           <div className="border-l-4 border-warning-400 bg-warning-50 p-3 rounded-[var(--radius-md)] text-sm text-warning-500">
             ⚠ Este rol tiene usuarios activos. Deberás reasignarles un rol antes
             de que puedan iniciar sesión de nuevo.
