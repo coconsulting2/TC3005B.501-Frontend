@@ -1,10 +1,11 @@
 ---
 /**
-*Author: Hector Julian Zarate Ramirez
-*
-*Description: This script is used to create a page that shows the details of a request, based on the id passed in the URL.
-*
-**/
+ *Author: Hector Julian Zarate Ramirez
+ *Updated: Added comments thread integration
+ *
+ *Description: This script is used to create a page that shows the details of a request, based on the id passed in the URL.
+ *
+ **/
 export const prerender = false;
 
 import MainLayout from "@layouts/MainLayout.astro";
@@ -17,6 +18,8 @@ import { roleLabels } from "@config/role-labels";
 const role: UserRole = getCookie("role", Astro.cookies) as UserRole;
 const userName = getCookie("username", Astro.cookies);
 const buttonLabel = roleLabels[role];
+const token = getCookie("token", Astro.cookies);
+const userId = getCookie("id", Astro.cookies);
 
 import { apiRequest } from "@/utils/apiClient";
 
@@ -33,5 +36,9 @@ try {
 ---
 
 <MainLayout title={`Detalle #${request.request_id}`} data={{ userName, buttonLabel, role }} >
-  <RequestDetail request={request} />
+  <RequestDetail
+    request={request}
+    currentUserId={userId ? parseInt(userId as string) : undefined}
+    authToken={token as string}
+  />
 </MainLayout>
