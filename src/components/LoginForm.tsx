@@ -122,6 +122,8 @@ function EyeSlashIcon() {
 export default function LoginForm() {
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
+  /** Opcional: id de organización si el mismo usuario existe en varios tenants. */
+  const [organizationId, setOrganizationId] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
@@ -130,9 +132,16 @@ export default function LoginForm() {
     await apiRequest("/user/logout", { method: "GET" });
 
     try {
+      const data: { username: string; password: string; organization_id?: string } = {
+        username,
+        password,
+      };
+      if (organizationId.trim()) {
+        data.organization_id = organizationId.trim();
+      }
       const response = await apiRequest("/user/login", {
         method: "POST",
-        data: { username, password },
+        data,
       });
 
       setErrorMessage("");
@@ -143,8 +152,16 @@ export default function LoginForm() {
       document.cookie = `department_id=${response.department_id}; path=/`;
       window.location.href = "/dashboard";
     } catch (error: any) {
-      const msg = error?.response?.data?.error || "Error al iniciar sesión";
-      setErrorMessage(msg);
+      const resData = error?.response?.data;
+      if (resData?.code === "AMBIGUOUS_USERNAME" && Array.isArray(resData.organizations)) {
+        const orgs = resData.organizations
+          .map((o: { id: string; nombre: string }) => `${o.nombre || "?"} (id ${o.id})`)
+          .join(" · ");
+        setErrorMessage(`${resData.error || "Usuario duplicado entre organizaciones."} ${orgs}`);
+      } else {
+        const msg = resData?.error || "Error al iniciar sesión";
+        setErrorMessage(msg);
+      }
     }
   };
 
@@ -438,6 +455,26 @@ export default function LoginForm() {
                   {showPassword ? <EyeSlashIcon /> : <EyeIcon />}
                 </button>
               </div>
+            </div>
+
+            {/* Id organización (opcional, multi-tenant) */}
+            <div className="mb-5 md:mb-6">
+              <label htmlFor="organization_id" style={labelStyle}>
+                Id organización <span style={{ textTransform: "none", letterSpacing: 0 }}>(opcional)</span>
+              </label>
+              <input
+                id="organization_id"
+                name="organization_id"
+                type="text"
+                inputMode="numeric"
+                autoComplete="off"
+                placeholder="Ej. 100 — solo si te lo indica el administrador"
+                value={organizationId}
+                onChange={(e) => setOrganizationId(e.target.value)}
+                style={inputStyle}
+                onFocus={handleFocus}
+                onBlur={handleBlur}
+              />
             </div>
 
             {/* CTA */}
