@@ -8,6 +8,7 @@ export const prerender = false;
 import MainLayout from "@layouts/MainLayout.astro";
 import RequestDetail from "@components/RequestDetail.astro";
 import AproveRequest from "@components/AproveRequestModal";
+import AttendRequest from "@components/AttendRequest";
 import type { UserRole } from "@type/roles";
 
 import { getCookie } from "@data/cookies";
@@ -16,6 +17,8 @@ import { roleLabels } from "@config/role-labels";
 const role: UserRole = getCookie("role", Astro.cookies) as UserRole;
 const userName = getCookie("username", Astro.cookies);
 const buttonLabel = roleLabels[role];
+const token = getCookie("token", Astro.cookies);
+const userId = getCookie("id", Astro.cookies);
 
 import { apiRequest } from "@/utils/apiClient";
 
@@ -29,6 +32,11 @@ try {
   return Astro.redirect('/404');
 }
 
+/** Misma UX que cotizar-solicitud: si requiere vuelo, mostrar búsqueda Duffel/sandbox antes de finalizar. */
+const needsPlane =
+  Array.isArray(request.routes) &&
+  request.routes.some((r: { plane_needed?: boolean }) => Boolean(r.plane_needed));
+
 ---
 
 <MainLayout title={`Solicitud #${request.request_id}`} data={{ userName, buttonLabel, role }} >
@@ -36,19 +44,31 @@ try {
     request={request}
     title={`SOLICITUD #${request.request_id}`}
     subtitle="Detalles de la Solicitud a Atender"
+    currentUserId={userId ? parseInt(String(userId), 10) : undefined}
+    authToken={token}
   />
-  <div class="flex justify-end gap-4 mt-8">
-    <AproveRequest
-      client:only="react"
-      request_id={request.request_id}
-      title="Confirmar envío"
-      message="¿Está seguro de aprobar esta solicitud?"
-      redirection="/dashboard"
-      modal_type="success"
-      variant="filled"
-      token={getCookie("token", Astro.cookies)}
-    >
-      Aprobar
-    </AproveRequest>
-  </div>
+  {needsPlane ? (
+    <div class="mt-8">
+      <AttendRequest
+        client:only="react"
+        request_id={String(request.request_id)}
+        token={token}
+      />
+    </div>
+  ) : (
+    <div class="flex justify-end gap-4 mt-8">
+      <AproveRequest
+        client:only="react"
+        request_id={request.request_id}
+        title="Finalizar atención"
+        message="¿Marcar esta solicitud como atendida por agencia? (sin vuelo requerido en la solicitud)"
+        redirection="/dashboard"
+        modal_type="success"
+        variant="filled"
+        token={token}
+      >
+        Finalizar atención
+      </AproveRequest>
+    </div>
+  )}
 </MainLayout>

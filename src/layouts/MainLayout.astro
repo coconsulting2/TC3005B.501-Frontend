@@ -47,7 +47,7 @@ const { title, data, showMessages = false } = Astro.props;
       </aside>
 
       <section id="content">
-        <div class="p-4 md:p-8 lg:p-10 max-w-[1200px]">
+        <div class="w-full min-w-0 max-w-none p-4 md:p-8 lg:p-10">
           <slot />
         </div>
       </section>
@@ -97,8 +97,16 @@ const { title, data, showMessages = false } = Astro.props;
       #content {
         grid-area: content;
         height: 100%;
+        min-width: 0;
         overflow-y: auto;
+        overflow-x: hidden;
         background: var(--color-surface);
+      }
+
+      #content astro-island {
+        display: block;
+        width: 100%;
+        min-width: 0;
       }
 
       #messages {

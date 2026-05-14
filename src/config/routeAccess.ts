@@ -44,6 +44,8 @@ export const roleRoutes: Record<UserRole, string[]> = {
     "/perfil-usuario",
     "/cotizaciones",
     "/comprobaciones",
+    "/exportar-contable",
+    "/reportes/gastos-por-centro",
     "/cotizar-solicitud/*",
     "/comprobar-gastos",
     "/comprobar-gastos/*",

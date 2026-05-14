@@ -4,6 +4,7 @@
  */
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { resolveApiBaseUrl } from '@utils/apiClient';
 import CommentMessage from './CommentMessage';
 import CommentMessageGroup from './CommentMessageGroup';
 import CommentInput from './CommentInput';
@@ -57,6 +58,10 @@ function useLiveData<T = unknown>({
   parse = JSON.parse,
 }: LiveDataOptions<T>): T | null {
   const [data, setData] = useState<T | null>(null);
+  const parseRef = useRef(parse);
+  const onErrorRef = useRef(onError);
+  parseRef.current = parse;
+  onErrorRef.current = onError;
 
   useEffect(() => {
     const controller = new AbortController();
@@ -71,18 +76,18 @@ function useLiveData<T = unknown>({
         });
       } catch (e) {
         if ((e as Error).name !== 'AbortError') {
-          onError?.(e as Error);
+          onErrorRef.current?.(e as Error);
         }
         return;
       }
 
       if (!res.ok) {
-        onError?.(new Error(`HTTP ${res.status}: ${res.statusText}`));
+        onErrorRef.current?.(new Error(`HTTP ${res.status}: ${res.statusText}`));
         return;
       }
 
       if (!res.body) {
-        onError?.(new Error('Response body is null'));
+        onErrorRef.current?.(new Error('Response body is null'));
         return;
       }
 
@@ -102,15 +107,15 @@ function useLiveData<T = unknown>({
             if (!raw || raw === '[DONE]') continue;
 
             try {
-              setData(parse(raw));
+              setData(parseRef.current(raw) as T);
             } catch (parseError) {
-              onError?.(parseError as Error);
+              onErrorRef.current?.(parseError as Error);
             }
           }
         }
       } catch (e) {
         if ((e as Error).name !== 'AbortError') {
-          onError?.(e as Error);
+          onErrorRef.current?.(e as Error);
         }
       } finally {
         reader.releaseLock();
@@ -119,7 +124,7 @@ function useLiveData<T = unknown>({
 
     start();
     return () => controller.abort();
-  }, [url, token, onError, parse]);
+  }, [url, token]);
 
   return data;
 }
@@ -177,7 +182,7 @@ export default function CommentsThread({
   requestId,
   currentUserId,
   authToken,
-  apiBaseUrl = `${window.location.protocol}//${window.location.host}/api`,
+  apiBaseUrl = resolveApiBaseUrl(),
 }: CommentsThreadProps): React.ReactElement {
   const streamUrl = `${apiBaseUrl}/solicitudes/${requestId}/comments/stream?user_id=${currentUserId}&limit=200`;
 

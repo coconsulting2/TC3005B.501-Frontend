@@ -25,7 +25,7 @@ const fixedRoles: Role[] = [
   {
     role_id: 1,
     name: "Administrador",
-    permissions: ["admin.roles.gestionar"],
+    permissions: ["role:manage_permissions"],
     max_authorization_amount: null,
     expiration_date: null,
     is_admin: true,
@@ -47,7 +47,7 @@ const twoAdminRoles: Role[] = [
   {
     role_id: 3,
     name: "Admin secundario",
-    permissions: ["admin.roles.gestionar"],
+    permissions: ["role:manage_permissions"],
     max_authorization_amount: null,
     expiration_date: null,
     is_admin: true,
@@ -136,12 +136,11 @@ describe("RolesAdmin", () => {
       screen.getByText(/5 usuarios activos/i),
     ).toBeInTheDocument();
     expect(
-      screen.getByText(/quedarán sin rol asignado/i),
+      screen.getByText(/reasígnalos antes de eliminar el rol/i),
     ).toBeInTheDocument();
 
-    await user.click(
-      screen.getByRole("button", { name: /eliminar de todos modos/i }),
-    );
+    const dlg = screen.getByRole("dialog");
+    await user.click(within(dlg).getByRole("button", { name: /^eliminar$/i }));
 
     expect(
       await screen.findByText(/rol "solicitante" eliminado/i),
@@ -160,7 +159,7 @@ describe("RolesAdmin", () => {
       await screen.findByText(/último rol administrador/i),
     ).toBeInTheDocument();
     expect(
-      screen.queryByRole("button", { name: /eliminar de todos modos/i }),
+      within(screen.getByRole("dialog")).queryByRole("button", { name: /^eliminar$/i }),
     ).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /cerrar/i })).toBeInTheDocument();
   });
@@ -175,7 +174,7 @@ describe("RolesAdmin", () => {
     await user.click(within(secondaryRow).getByRole("button", { name: /eliminar/i }));
 
     expect(
-      await screen.findByRole("button", { name: /eliminar de todos modos/i }),
+      await within(screen.getByRole("dialog")).findByRole("button", { name: /^eliminar$/i }),
     ).toBeInTheDocument();
   });
 
@@ -202,15 +201,20 @@ describe("RolesAdmin", () => {
     });
   });
 
-  it("falls back to the seed list when the API endpoint fails", async () => {
+  it("muestra aviso y tabla vacía cuando fallan roles y permisos desde el API", async () => {
     server.use(
       http.get(`${API}/admin/roles`, () =>
         HttpResponse.json({ error: "x" }, { status: 500 }),
       ),
+      http.get(`${API}/admin/permissions`, () =>
+        HttpResponse.json({ error: "x" }, { status: 500 }),
+      ),
     );
     render(<RolesAdmin apiEndpoint="/admin/roles" />);
-    expect(await screen.findByText("Administrador")).toBeInTheDocument();
-    expect(screen.getByText("Solicitante")).toBeInTheDocument();
+    expect(
+      await screen.findByText(/no se pudieron cargar roles o permisos/i),
+    ).toBeInTheDocument();
+    expect(screen.getByText(/No hay roles registrados/i)).toBeInTheDocument();
   });
 
   it("toggles a single permission on the create form", async () => {
