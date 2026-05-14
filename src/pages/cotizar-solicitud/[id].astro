@@ -15,6 +15,8 @@ import { roleLabels } from "@config/role-labels";
 const role: UserRole = getCookie("role", Astro.cookies) as UserRole;
 const userName = getCookie("username", Astro.cookies);
 const buttonLabel = roleLabels[role];
+const token = getCookie("token", Astro.cookies);
+const userId = getCookie("id", Astro.cookies);
 
 import { apiRequest } from "@/utils/apiClient";
 
@@ -34,6 +36,8 @@ try {
     request={request}
     title={`SOLICITUD #${request.request_id}`}
     subtitle="Detalles de la Solicitud a Cotizar"
+    currentUserId={userId ? parseInt(String(userId), 10) : undefined}
+    authToken={token}
   />
   <div class="flex mt-8">
     <AttendRequest

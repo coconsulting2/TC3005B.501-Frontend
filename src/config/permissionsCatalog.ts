@@ -74,7 +74,7 @@ export const PERMISSIONS_CATALOG: PermissionModule[] = [
     key: "administracion",
     label: "Administración",
     permissions: [
-      { code: "admin.roles.gestionar", label: "Gestionar roles y permisos" },
+      { code: "role:manage_permissions", label: "Gestionar roles y permisos" },
       { code: "admin.audit.ver", label: "Ver bitácora de auditoría" },
       { code: "admin.sistema.configurar", label: "Configurar sistema" },
     ],
@@ -85,4 +85,4 @@ export const ALL_PERMISSION_CODES: string[] = PERMISSIONS_CATALOG.flatMap((m) =>
   m.permissions.map((p) => p.code)
 );
 
-export const ADMIN_PERMISSION_CODE = "admin.roles.gestionar";
+export const ADMIN_PERMISSION_CODE = "role:manage_permissions";
