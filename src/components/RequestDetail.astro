@@ -4,13 +4,14 @@
  * 
  * Description:
  *   This component displays the detailed information of a travel request in a structured and styled way.
- *   Includes a button to navigate back to the requests history.
- * 
+ *   Includes a button to navigate back to the requests history and an embedded comments thread.
+ *
  * Author: Kenia Esmeralda Ramos Javier.
  **/
 
 import TextHeader from '@components/TextHeader.astro';
-const { request, title, subtitle } = Astro.props;
+import CommentsThread from '@components/CommentsThread';
+const { request, title, subtitle, currentUserId, authToken } = Astro.props;
 ---
 
 <main class="flex flex-col items-center">
@@ -79,5 +80,14 @@ const { request, title, subtitle } = Astro.props;
         <p class="text-lg">{request.notes}</p>
       </section>
     )}
+
+    <section class="mt-12 pt-8 border-t-2 border-gray-200">
+      <CommentsThread
+        client:only="react"
+        requestId={request.request_id}
+        currentUserId={currentUserId || 1}
+        authToken={authToken || ''}
+      />
+    </section>
   </div>
 </main>
