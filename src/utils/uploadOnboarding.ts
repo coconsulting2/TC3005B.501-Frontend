@@ -10,6 +10,7 @@ import { getImpersonatedOrgId } from "@stores/organizationStore";
 import type {
   PreviewImportResponse,
   ApplyImportResponse,
+  CustomImportRoleSpec,
 } from "@type/onboardingImport";
 
 const DEFAULT_API = "https://localhost:3000/api";
@@ -22,6 +23,8 @@ export type ApplyImportOptions = {
    */
   roleOverrides?: Record<string, string>;
   permissionExtras?: Record<string, string[]>;
+  /** userName → rol creado en BD al aplicar: clona tope del rol base y permisos exactos. */
+  customImportRoles?: Record<string, CustomImportRoleSpec>;
   /** Misma contraseña para todos los usuarios del lote (opcional). */
   passwordGlobal?: string;
   /** userName → contraseña individual; tiene prioridad sobre global y archivo. */
@@ -157,8 +160,8 @@ export async function applyImportPreview(
     }
     if (Object.keys(filtered).length > 0) body.passwordOverrides = filtered;
   }
-  if (opts?.createNewOrganization) {
-    body.createNewOrganization = true;
+  if (opts?.customImportRoles && Object.keys(opts.customImportRoles).length > 0) {
+    body.customImportRoles = opts.customImportRoles;
   }
 
   const res = await fetch(`${base}/onboarding/import/apply`, {
