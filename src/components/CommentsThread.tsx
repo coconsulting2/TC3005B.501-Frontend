@@ -201,12 +201,16 @@ export default function CommentsThread({
   const [pendingMessages, setPendingMessages] = useState<PendingMessage[]>([]);
   const [msg, setMsg] = useState('');
   const [newMessageAlert, setNewMessageAlert] = useState(false);
-  const bottomRef = useRef<HTMLDivElement>(null);
+  const containerRef = useRef<HTMLDivElement>(null);
   const prevDataSignature = useRef<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const scrollBottom = () => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (!containerRef.current) return;
+    containerRef.current.scroll({
+      top: containerRef.current.scrollHeight + 100,
+      behavior: 'smooth',
+    });
   };
 
   useEffect(() => {
@@ -247,7 +251,10 @@ export default function CommentsThread({
     if (!content) return;
 
     const id = crypto.randomUUID();
-    setPendingMessages((prev) => [...prev, { id, msg: content, posted: false, refreshesAfterPost: 0 }]);
+    setPendingMessages((prev) => {
+        setTimeout(scrollBottom, 50);
+        return [...prev, { id, msg: content, posted: false, refreshesAfterPost: 0 }];
+    });
     setMsg('');
 
     try {
@@ -257,7 +264,7 @@ export default function CommentsThread({
           user_id: currentUserId,
           content,
         },
-        headers: { Authorization: `Bearer ${authToken}` },
+        headers: { Authorization: `Bearer ${authToken}`, credentials: "include" },
       });
 
       setPendingMessages((prev) => prev.map((message) => (message.id === id ? { ...message, posted: true } : message)));
@@ -283,8 +290,8 @@ export default function CommentsThread({
         <h3 className="text-lg font-serif font-editorial text-ink">Comentarios de la solicitud</h3>
       </div>
 
-      {/* Área scroll: min-h-0/min-w-0 para que el flex no comprima el texto a un “columna” de una letra */}
-      <div className="min-h-0 min-w-0 flex-1 space-y-6 overflow-y-auto px-6 py-4">
+      {/* Área scroll: min-h-0/min-w-0 para que el flex no comprima el texto a un "columna" de una letra */}
+      <div ref={containerRef} className="min-h-0 min-w-0 max-h-[25rem] flex-1 space-y-6 overflow-y-scroll px-6 py-4 scrollable">
         {!data && <CommentLoading />}
 
         {groupedMessages.map((group, groupIndex) => (
@@ -301,7 +308,7 @@ export default function CommentsThread({
             ))}
           </CommentMessageGroup>
         ))}
-{/*       
+
         {pendingMessages.length > 0 && (
           <CommentMessageGroup send={true} loading={true}>
             {pendingMessages.map((m) => (
@@ -310,7 +317,7 @@ export default function CommentsThread({
               </CommentMessage>
             ))}
           </CommentMessageGroup>
-        )} */}
+        )}
 
         {newMessageAlert && (
           <button
@@ -326,8 +333,6 @@ export default function CommentsThread({
             </svg>
           </button>
         )}
-
-        <div ref={bottomRef} />
       </div>
 
       {/* Error Display */}
