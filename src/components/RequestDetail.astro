@@ -81,7 +81,7 @@ const { request, title, subtitle, currentUserId, authToken } = Astro.props;
       </section>
     )}
 
-    <section class="mt-12 pt-8 border-t-2 border-gray-200">
+    <section class="mt-12 pt-8 border-t-2 border-gray-200 max-h-2/12">
       <CommentsThread
         client:only="react"
         requestId={request.request_id}
