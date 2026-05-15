@@ -101,6 +101,11 @@ export interface PreviewImportResponse {
   previewCreateNewOrganization?: boolean;
 }
 
+export interface CustomImportRoleSpec {
+  templateRoleName: string;
+  permissions: string[];
+}
+
 export interface ApplyImportFailure {
   userName: string;
   reason: string;

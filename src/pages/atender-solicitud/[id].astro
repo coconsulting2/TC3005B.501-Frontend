@@ -21,6 +21,10 @@ const token = getCookie("token", Astro.cookies);
 const userId = getCookie("id", Astro.cookies);
 
 import { apiRequest } from "@/utils/apiClient";
+import {
+  buildHotelSearchDefaults,
+  computeAgencyServiceFlags,
+} from "@/utils/travelRequestAgency";
 
 const { id } = Astro.params;
 let request = null;
@@ -32,10 +36,9 @@ try {
   return Astro.redirect('/404');
 }
 
-/** Misma UX que cotizar-solicitud: si requiere vuelo, mostrar búsqueda Duffel/sandbox antes de finalizar. */
-const needsPlane =
-  Array.isArray(request.routes) &&
-  request.routes.some((r: { plane_needed?: boolean }) => Boolean(r.plane_needed));
+const { needsPlane, needsHotel } = computeAgencyServiceFlags(request.routes);
+const hotelSearchDefaults = buildHotelSearchDefaults(request.routes);
+const needsAgencyQuotation = needsPlane || needsHotel;
 
 ---
 
@@ -47,12 +50,15 @@ const needsPlane =
     currentUserId={userId ? parseInt(String(userId), 10) : undefined}
     authToken={token}
   />
-  {needsPlane ? (
+  {needsAgencyQuotation ? (
     <div class="mt-8">
       <AttendRequest
         client:only="react"
         request_id={String(request.request_id)}
         token={token}
+        needsPlane={needsPlane}
+        needsHotel={needsHotel}
+        hotelSearchDefaults={hotelSearchDefaults}
       />
     </div>
   ) : (

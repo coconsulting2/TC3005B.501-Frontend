@@ -22,24 +22,24 @@ export default function CommentMessageGroup({
   children,
 }: CommentMessageGroupProps): React.ReactElement {
   return (
-    <div className={`flex gap-3 ${send ? 'flex-row-reverse' : 'flex-row'}`}>
+    <div className={`flex w-full min-w-0 gap-3 ${send ? 'flex-row-reverse' : 'flex-row'}`}>
       {/* Avatar */}
-      <div className="flex-shrink-0 pt-1">
+      <div className="shrink-0 pt-1">
         <Avatar name={send ? 'Me' : name} role={role} />
       </div>
 
-      {/* Messages */}
-      <div className={`flex flex-col gap-2 ${send ? 'items-end' : 'items-start'}`}>
+      {/* Columna de mensajes: ocupa el resto del ancho; las burbujas llevan shrink-0 para no aplastarse */}
+      <div className={`flex min-w-0 flex-1 flex-col gap-2 overflow-hidden ${send ? 'items-end' : 'items-start'}`}>
         {/* Sender Info */}
         {!send && name && (
-          <div className="flex items-baseline gap-2 px-4">
+          <div className="flex max-w-full flex-wrap items-baseline gap-2 px-1">
             <span className="text-sm font-medium text-ink">{name}</span>
             {role && <span className="text-xs text-ink-muted uppercase tracking-wide">{role}</span>}
           </div>
         )}
 
         {/* Message Bubbles */}
-        <div className={`flex flex-col gap-2 ${send ? 'items-end' : 'items-start'}`}>
+        <div className={`flex w-full min-w-0 flex-col gap-2 ${send ? 'items-end' : 'items-start'}`}>
           {children}
         </div>
 
