@@ -15,6 +15,7 @@ import type {
   ImportConflict,
   PermissionsCatalog,
   ImportUserPreview,
+  CustomImportRoleSpec,
 } from "@type/onboardingImport";
 import { getPermissionFriendlyLabel } from "@utils/permissionLabels";
 import {
@@ -84,6 +85,10 @@ export default function OnboardingImportAdmin({ orgId }: Props) {
   const [passwordOverridesByUser, setPasswordOverridesByUser] = useState<Record<string, string>>({});
   /** userName → rol elegido en la UI (sobrescribe el del archivo y los mappings). */
   const [roleOverridesByUser, setRoleOverridesByUser] = useState<Record<string, string>>({});
+  /** userName → rol a medida (se crea en BD al importar; base + lista exacta de permisos). */
+  const [customImportRolesByUser, setCustomImportRolesByUser] = useState<
+    Record<string, CustomImportRoleSpec>
+  >({});
   const [previewApplyError, setPreviewApplyError] = useState("");
   /** Vista previa con `?create_new_org=1` (solo JSON con bloque organization + permiso crear org). */
   const [createNewOrgOption, setCreateNewOrgOption] = useState(false);
@@ -122,6 +127,7 @@ export default function OnboardingImportAdmin({ orgId }: Props) {
     setGlobalPassword("");
     setPasswordOverridesByUser({});
     setRoleOverridesByUser({});
+    setCustomImportRolesByUser({});
     setPreviewApplyError("");
     setCreateNewOrgOption(false);
   }, [preview?.previewToken]);
@@ -250,8 +256,23 @@ export default function OnboardingImportAdmin({ orgId }: Props) {
       for (const [un, pwd] of Object.entries(passwordOverridesByUser)) {
         if (pwd.trim()) pwdOverrides[un] = pwd.trim();
       }
+      const customPayload: Record<string, CustomImportRoleSpec> = {};
+      for (const [un, spec] of Object.entries(customImportRolesByUser)) {
+        if (
+          spec?.permissions?.length &&
+          typeof spec.templateRoleName === "string" &&
+          spec.templateRoleName.trim()
+        ) {
+          customPayload[un] = {
+            templateRoleName: spec.templateRoleName.trim(),
+            permissions: [...spec.permissions],
+          };
+        }
+      }
+
       const roleOverridesPayload: Record<string, string> = {};
       for (const [un, role] of Object.entries(roleOverridesByUser)) {
+        if (customPayload[un]) continue;
         if (role.trim()) roleOverridesPayload[un] = role.trim();
       }
 
@@ -264,6 +285,8 @@ export default function OnboardingImportAdmin({ orgId }: Props) {
         passwordGlobal: g || undefined,
         passwordOverrides: Object.keys(pwdOverrides).length > 0 ? pwdOverrides : undefined,
         createNewOrganization: Boolean(preview.previewCreateNewOrganization),
+        customImportRoles:
+          Object.keys(customPayload).length > 0 ? customPayload : undefined,
       });
       setResult(res);
       setPhase("done");
@@ -284,6 +307,7 @@ export default function OnboardingImportAdmin({ orgId }: Props) {
     setGlobalPassword("");
     setPasswordOverridesByUser({});
     setRoleOverridesByUser({});
+    setCustomImportRolesByUser({});
     setPreviewApplyError("");
     setCreateNewOrgOption(false);
   };
@@ -407,6 +431,8 @@ export default function OnboardingImportAdmin({ orgId }: Props) {
           onRoleMappingChange={setRoleMappingSelections}
           permissionExtrasByUser={permissionExtrasByUser}
           onPermissionExtrasChange={setPermissionExtrasByUser}
+          customImportRolesByUser={customImportRolesByUser}
+          onCustomImportRolesChange={setCustomImportRolesByUser}
           globalPassword={globalPassword}
           onGlobalPasswordChange={setGlobalPassword}
           passwordOverridesByUser={passwordOverridesByUser}
@@ -419,6 +445,12 @@ export default function OnboardingImportAdmin({ orgId }: Props) {
               const next = { ...prev };
               if (roleName) next[userName] = roleName;
               else delete next[userName];
+              return next;
+            });
+            setCustomImportRolesByUser((prev) => {
+              if (!prev[userName]) return prev;
+              const next = { ...prev };
+              delete next[userName];
               return next;
             });
           }}
@@ -495,6 +527,8 @@ function PreviewPanel({
   onRoleMappingChange,
   permissionExtrasByUser,
   onPermissionExtrasChange,
+  customImportRolesByUser,
+  onCustomImportRolesChange,
   globalPassword,
   onGlobalPasswordChange,
   passwordOverridesByUser,
@@ -512,6 +546,8 @@ function PreviewPanel({
   onRoleMappingChange: React.Dispatch<React.SetStateAction<Record<string, string>>>;
   permissionExtrasByUser: Record<string, string[]>;
   onPermissionExtrasChange: React.Dispatch<React.SetStateAction<Record<string, string[]>>>;
+  customImportRolesByUser: Record<string, CustomImportRoleSpec>;
+  onCustomImportRolesChange: React.Dispatch<React.SetStateAction<Record<string, CustomImportRoleSpec>>>;
   globalPassword: string;
   onGlobalPasswordChange: (v: string) => void;
   passwordOverridesByUser: Record<string, string>;
@@ -525,6 +561,8 @@ function PreviewPanel({
   onReset: () => void;
 }) {
   const [extrasModalUser, setExtrasModalUser] = useState<string | null>(null);
+  const [customImportModalUser, setCustomImportModalUser] = useState<string | null>(null);
+  const [importRoleSelectBump, setImportRoleSelectBump] = useState<Record<string, number>>({});
   const [showGlobalPassword, setShowGlobalPassword] = useState(false);
   const [passwordPeekByUser, setPasswordPeekByUser] = useState<Record<string, boolean>>({});
 
@@ -546,6 +584,17 @@ function PreviewPanel({
    */
   const getEffectiveRow = useCallback(
     (u: ImportUserPreview): ImportUserPreview => {
+      const custom = customImportRolesByUser[u.userName];
+      if (custom?.permissions?.length) {
+        const perms = [...custom.permissions];
+        return {
+          ...u,
+          roleName: `Otro (base: ${custom.templateRoleName})`,
+          rolePermissionCodes: perms,
+          effectivePermissions: perms,
+          needsRoleMapping: false,
+        };
+      }
       const override = (roleOverridesByUser[u.userName] ?? "").trim();
       if (!override) return u;
       const codes = rolePermissionsByName.get(override.toLowerCase()) ?? [];
@@ -557,7 +606,7 @@ function PreviewPanel({
         needsRoleMapping: false,
       };
     },
-    [roleOverridesByUser, rolePermissionsByName]
+    [roleOverridesByUser, rolePermissionsByName, customImportRolesByUser]
   );
 
   const extrasModalRow = useMemo(() => {
@@ -865,12 +914,13 @@ function PreviewPanel({
                 lineHeight: 1.45,
               }}
             >
-              <strong>Permisos:</strong> el rol define la base. En el editor verás cada permiso explicado
-              en forma clara; el código técnico solo aparece como referencia pequeña debajo. Puedes añadir{" "}
-              <strong>permisos extra</strong> con el botón de cada fila.{" "}
+              <strong>Permisos:</strong> el rol define la base. Puedes elegir <strong>Otro (desde base…)</strong> en
+              el desplegable para clonar un rol (p. ej. N1), marcar o desmarcar cualquier permiso del catálogo y, al
+              importar, se creará un <strong>rol nuevo solo para esa persona</strong> (nombre tipo{" "}
+              <code style={{ fontSize: 12 }}>Imp·usuario</code>). También puedes añadir permisos extra con el botón
+              de cada fila cuando uses un rol predefinido.{" "}
               <span style={{ color: T.inkMuted }}>
-                No se pueden quitar aquí permisos que ya trae el rol; cambia el rol en el archivo o edita
-                al usuario después del alta.
+                En roles predefinidos, el editor de «extras» solo añade permisos; no quita los del rol.
               </span>
             </p>
           ) : null}
@@ -898,7 +948,9 @@ function PreviewPanel({
                 {preview.preview.map((u, i) => {
                   const eff = getEffectiveRow(u);
                   const overrideValue = roleOverridesByUser[u.userName] ?? "";
-                  const stillNeedsMapping = Boolean(u.needsRoleMapping) && !overrideValue.trim();
+                  const hasCustomImport = Boolean(customImportRolesByUser[u.userName]?.permissions?.length);
+                  const stillNeedsMapping =
+                    Boolean(u.needsRoleMapping) && !overrideValue.trim() && !hasCustomImport;
                   return (
                     <tr
                       key={`${u.userName}-${i}`}
@@ -964,9 +1016,20 @@ function PreviewPanel({
                           stillNeedsMapping={stillNeedsMapping}
                           rolesAvailable={rolesAvailable}
                           overrideValue={overrideValue}
+                          customSpec={customImportRolesByUser[u.userName] ?? null}
+                          selectBump={importRoleSelectBump[u.userName] ?? 0}
+                          onRequestCustomImport={() => {
+                            setCustomImportModalUser(u.userName);
+                            setImportRoleSelectBump((prev) => ({
+                              ...prev,
+                              [u.userName]: (prev[u.userName] ?? 0) + 1,
+                            }));
+                          }}
                           onOverrideChange={(v) => onRoleOverrideChange(u.userName, v)}
                           extraCount={(permissionExtrasByUser[u.userName] ?? []).length}
-                          canEdit={Boolean(catalog?.groups?.length) && !stillNeedsMapping}
+                          canEdit={
+                            Boolean(catalog?.groups?.length) && !stillNeedsMapping && !hasCustomImport
+                          }
                           onEdit={() => setExtrasModalUser(u.userName)}
                         />
                       </td>
@@ -990,6 +1053,36 @@ function PreviewPanel({
           onPermissionExtrasChange((prev) => ({ ...prev, [extrasModalUser]: codes }));
         }}
         onClose={() => setExtrasModalUser(null)}
+      />
+
+      <CustomImportRoleModal
+        open={Boolean(customImportModalUser && catalog?.groups?.length && rolesAvailable.length)}
+        userName={customImportModalUser}
+        previewRow={
+          customImportModalUser
+            ? preview.preview.find((x) => x.userName === customImportModalUser) ?? null
+            : null
+        }
+        initialSpec={
+          customImportModalUser ? customImportRolesByUser[customImportModalUser] ?? null : null
+        }
+        rolesAvailable={rolesAvailable}
+        rolePermissionsByName={rolePermissionsByName}
+        catalog={catalog ?? { groups: [] }}
+        onClose={() => setCustomImportModalUser(null)}
+        onSave={(spec) => {
+          if (!customImportModalUser) return;
+          onCustomImportRolesChange((prev) => ({
+            ...prev,
+            [customImportModalUser]: spec,
+          }));
+          onPermissionExtrasChange((prev) => {
+            const next = { ...prev };
+            delete next[customImportModalUser];
+            return next;
+          });
+          setCustomImportModalUser(null);
+        }}
       />
 
       {/* Errores de validación */}
@@ -1208,6 +1301,269 @@ function ConflictList({ conflicts }: { conflicts: ImportConflict[] }) {
   );
 }
 
+const IMPORT_CUSTOM_OPEN = "__IMPORT_CUSTOM_OPEN__";
+const IMPORT_CUSTOM_SAVED = "__IMPORT_CUSTOM_SAVED__";
+
+function CustomImportRoleModal({
+  open,
+  userName,
+  previewRow,
+  initialSpec,
+  rolesAvailable,
+  rolePermissionsByName,
+  catalog,
+  onClose,
+  onSave,
+}: {
+  open: boolean;
+  userName: string | null;
+  previewRow: ImportUserPreview | null;
+  initialSpec: CustomImportRoleSpec | null;
+  rolesAvailable: string[];
+  rolePermissionsByName: Map<string, string[]>;
+  catalog: PermissionsCatalog;
+  onClose: () => void;
+  onSave: (spec: CustomImportRoleSpec) => void;
+}) {
+  const defaultTemplate = useMemo(() => {
+    if (initialSpec?.templateRoleName?.trim()) return initialSpec.templateRoleName.trim();
+    const fromRow = previewRow?.roleName?.trim();
+    if (fromRow && rolesAvailable.some((r) => r.toLowerCase() === fromRow.toLowerCase())) {
+      return fromRow;
+    }
+    return rolesAvailable[0] ?? "";
+  }, [initialSpec, previewRow, rolesAvailable]);
+
+  const [template, setTemplate] = useState(defaultTemplate);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+
+  useEffect(() => {
+    if (!open) return;
+    setTemplate(defaultTemplate);
+    const codes =
+      initialSpec?.permissions?.length && initialSpec.templateRoleName === defaultTemplate
+        ? initialSpec.permissions
+        : rolePermissionsByName.get(defaultTemplate.toLowerCase()) ?? [];
+    setSelected(new Set(codes));
+  }, [open, defaultTemplate, initialSpec, rolePermissionsByName]);
+
+  if (!open || !userName || !previewRow) return null;
+
+  const onTemplateChange = (t: string) => {
+    setTemplate(t);
+    setSelected(new Set(rolePermissionsByName.get(t.toLowerCase()) ?? []));
+  };
+
+  const toggleCode = (code: string) => {
+    setSelected((prev) => {
+      const n = new Set(prev);
+      if (n.has(code)) n.delete(code);
+      else n.add(code);
+      return n;
+    });
+  };
+
+  const handleSave = () => {
+    const t = template.trim();
+    if (!t) return;
+    const list = [...selected].filter(Boolean);
+    if (list.length === 0) return;
+    onSave({ templateRoleName: t, permissions: list.sort((a, b) => a.localeCompare(b)) });
+  };
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-labelledby="custom-import-role-title"
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 110,
+        background: T.scrim,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 16,
+      }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        style={{
+          background: T.surface,
+          borderRadius: 12,
+          maxWidth: 760,
+          width: "100%",
+          maxHeight: "90vh",
+          display: "flex",
+          flexDirection: "column",
+          boxShadow: "0 12px 40px rgba(10, 10, 10, 0.12)",
+          overflow: "hidden",
+          border: `1px solid ${T.border}`,
+        }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <header
+          style={{
+            padding: "16px 20px",
+            borderBottom: `1px solid ${T.border}`,
+            background: T.surfaceMuted,
+          }}
+        >
+          <h3 id="custom-import-role-title" style={{ margin: 0, fontSize: 18, color: T.ink }}>
+            Otro — rol a medida para {userName}
+          </h3>
+          <p style={{ margin: "8px 0 0", fontSize: 14, color: T.inkSecondary, lineHeight: 1.5 }}>
+            Elige un <strong>rol base</strong> de la organización para copiar su lista inicial de permisos; luego
+            marca o desmarca libremente. Al importar se creará un <strong>rol nuevo</strong> en la org (nombre tipo{" "}
+            <code style={{ fontSize: 12 }}>Imp·…</code>) con exactamente lo que marques, y se asignará a esta
+            persona.
+          </p>
+        </header>
+
+        <div style={{ padding: "12px 20px", borderBottom: `1px solid ${T.border}` }}>
+          <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: T.inkSecondary, marginBottom: 6 }}>
+            Rol base (plantilla)
+          </label>
+          <select
+            value={template}
+            onChange={(e) => onTemplateChange(e.target.value)}
+            style={{
+              width: "100%",
+              maxWidth: 360,
+              padding: "8px 10px",
+              borderRadius: 8,
+              border: `1px solid ${T.border}`,
+              fontSize: 14,
+              background: T.surface,
+            }}
+          >
+            {rolesAvailable.map((rn) => (
+              <option key={rn} value={rn}>
+                {rn}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div style={{ overflowY: "auto", padding: "16px 20px", flex: 1 }}>
+          {catalog.groups.map((group) => (
+            <section
+              key={group.resource}
+              style={{
+                marginBottom: 18,
+                padding: 12,
+                background: T.surfaceMuted,
+                borderRadius: 10,
+                border: `1px solid ${T.border}`,
+              }}
+            >
+              <h4
+                style={{
+                  margin: "0 0 10px",
+                  fontSize: 13,
+                  fontWeight: 700,
+                  color: T.ink,
+                  letterSpacing: "0.02em",
+                  textTransform: "uppercase",
+                }}
+              >
+                {group.label}
+              </h4>
+              <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                {group.items.map((item) => {
+                  const checked = selected.has(item.code);
+                  const { headline, showTechnicalRef } = getPermissionFriendlyLabel(item);
+                  return (
+                    <label
+                      key={item.code}
+                      style={{
+                        display: "flex",
+                        alignItems: "flex-start",
+                        gap: 10,
+                        cursor: "pointer",
+                        fontSize: 13,
+                        color: T.ink,
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={() => toggleCode(item.code)}
+                        style={{ marginTop: 3, width: 16, height: 16, flexShrink: 0 }}
+                      />
+                      <span>
+                        <span style={{ fontWeight: 600 }}>{headline}</span>
+                        {showTechnicalRef ? (
+                          <span
+                            style={{
+                              display: "block",
+                              fontSize: 11,
+                              color: T.technicalRef,
+                              fontFamily: "ui-monospace, monospace",
+                              marginTop: 2,
+                            }}
+                          >
+                            {item.code}
+                          </span>
+                        ) : null}
+                      </span>
+                    </label>
+                  );
+                })}
+              </div>
+            </section>
+          ))}
+        </div>
+
+        <footer
+          style={{
+            padding: "14px 20px",
+            borderTop: `1px solid ${T.border}`,
+            display: "flex",
+            justifyContent: "flex-end",
+            gap: 10,
+            background: T.surfaceMuted,
+          }}
+        >
+          <button
+            type="button"
+            onClick={onClose}
+            style={{
+              padding: "8px 16px",
+              borderRadius: 8,
+              border: `1px solid ${T.border}`,
+              background: T.surface,
+              cursor: "pointer",
+              fontWeight: 600,
+            }}
+          >
+            Cancelar
+          </button>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={selected.size === 0}
+            style={{
+              padding: "8px 18px",
+              borderRadius: 8,
+              border: "none",
+              background: selected.size === 0 ? T.border : T.primary,
+              color: T.surface,
+              cursor: selected.size === 0 ? "not-allowed" : "pointer",
+              fontWeight: 600,
+            }}
+          >
+            Guardar ({selected.size} permisos)
+          </button>
+        </footer>
+      </div>
+    </div>
+  );
+}
+
 function RolePermissionsCell({
   row,
   baseRoleName,
@@ -1215,6 +1571,9 @@ function RolePermissionsCell({
   stillNeedsMapping,
   rolesAvailable,
   overrideValue,
+  customSpec,
+  selectBump,
+  onRequestCustomImport,
   onOverrideChange,
   extraCount,
   canEdit,
@@ -1228,6 +1587,9 @@ function RolePermissionsCell({
   stillNeedsMapping: boolean;
   rolesAvailable: string[];
   overrideValue: string;
+  customSpec: CustomImportRoleSpec | null;
+  selectBump: number;
+  onRequestCustomImport: () => void;
   onOverrideChange: (roleName: string) => void;
   extraCount: number;
   canEdit: boolean;
@@ -1235,7 +1597,9 @@ function RolePermissionsCell({
 }) {
   const roleCodes = row.rolePermissionCodes ?? row.effectivePermissions ?? [];
   const nRole = roleCodes.length;
-  const isOverridden = overrideValue.trim().length > 0;
+  const hasCustom = Boolean(customSpec?.permissions?.length);
+  const isOverridden = overrideValue.trim().length > 0 || hasCustom;
+  const selectValue = hasCustom ? IMPORT_CUSTOM_SAVED : overrideValue;
 
   return (
     <div>
@@ -1265,12 +1629,22 @@ function RolePermissionsCell({
       )}
 
       <select
-        value={overrideValue}
-        onChange={(e) => onOverrideChange(e.target.value)}
+        key={`role-sel-${row.userName}-${selectBump}`}
+        value={selectValue}
+        onChange={(e) => {
+          const v = e.target.value;
+          if (v === IMPORT_CUSTOM_OPEN) {
+            onRequestCustomImport();
+            return;
+          }
+          onOverrideChange(v === IMPORT_CUSTOM_SAVED ? "" : v);
+        }}
         title={
-          isOverridden && baseRoleName
-            ? `Rol original del archivo: ${baseRoleName}`
-            : "Cambiar rol asignado a esta persona"
+          hasCustom && customSpec
+            ? `Rol a medida desde base «${customSpec.templateRoleName}»`
+            : isOverridden && baseRoleName
+              ? `Rol original del archivo: ${baseRoleName}`
+              : "Cambiar rol asignado a esta persona"
         }
         style={{
           width: "100%",
@@ -1292,13 +1666,25 @@ function RolePermissionsCell({
               ? "Elegir rol para esta persona…"
               : "Mantener rol del archivo"}
         </option>
+        {!stillNeedsMapping && rolesAvailable.length > 0 ? (
+          <option value={IMPORT_CUSTOM_OPEN}>Otro (desde base + permisos libres)…</option>
+        ) : null}
+        {hasCustom && customSpec ? (
+          <option value={IMPORT_CUSTOM_SAVED}>
+            Otro ✓ ({customSpec.templateRoleName}, {customSpec.permissions.length} perm.)
+          </option>
+        ) : null}
         {rolesAvailable.map((rn) => (
           <option key={rn} value={rn}>
             {rn}
           </option>
         ))}
       </select>
-      {isOverridden ? (
+      {hasCustom ? (
+        <p style={{ margin: "4px 0 0", fontSize: 11, color: T.primary }}>
+          Se creará un rol nuevo al importar (nombre automático <code style={{ fontSize: 10 }}>Imp·…</code>).
+        </p>
+      ) : isOverridden ? (
         <p style={{ margin: "4px 0 0", fontSize: 11, color: T.primary }}>
           Rol cambiado en la UI{baseRoleName ? ` (archivo: ${baseRoleName})` : ""}.
         </p>
@@ -1323,7 +1709,11 @@ function RolePermissionsCell({
           Ver / añadir permisos
         </button>
       ) : !stillNeedsMapping ? (
-        <span style={{ fontSize: 11, color: T.inkMuted }}>Sin catálogo de permisos</span>
+        <span style={{ fontSize: 11, color: T.inkMuted }}>
+          {hasCustom
+            ? "Los extras no se usan con rol a medida."
+            : "Sin catálogo de permisos"}
+        </span>
       ) : null}
     </div>
   );

@@ -4,7 +4,7 @@
  */
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { resolveApiBaseUrl } from '@utils/apiClient';
+import { apiRequest, resolveApiBaseUrl } from '@utils/apiClient';
 import CommentMessage from './CommentMessage';
 import CommentMessageGroup from './CommentMessageGroup';
 import CommentInput from './CommentInput';
@@ -240,39 +240,39 @@ export default function CommentsThread({
     }
   }, [data]);
 
-  useEffect(() => {
-    scrollBottom();
-  }, [pendingMessages]);
-
   const handleSendMessage = async (event: React.KeyboardEvent<HTMLInputElement>) => {
     if (event.key !== 'Enter') return;
 
+    const content = msg.trim();
+    if (!content) return;
+
     const id = crypto.randomUUID();
-    setPendingMessages((prev) => [...prev, { id, msg, posted: false, refreshesAfterPost: 0 }]);
+    setPendingMessages((prev) => [...prev, { id, msg: content, posted: false, refreshesAfterPost: 0 }]);
     setMsg('');
 
     try {
-      const postUrl = `${apiBaseUrl}/solicitudes/${requestId}/comments`;
-      const response = await fetch(postUrl, {
+      await apiRequest(`/solicitudes/${requestId}/comments`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${authToken}`,
-        },
-        body: JSON.stringify({
+        data: {
           user_id: currentUserId,
-          content: msg,
-        }),
+          content,
+        },
+        headers: { Authorization: `Bearer ${authToken}` },
       });
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        setError(errorData.error || 'Failed to send comment');
-      }
-
       setPendingMessages((prev) => prev.map((message) => (message.id === id ? { ...message, posted: true } : message)));
-    } catch (err) {
-      setError((err as Error).message);
+    } catch (err: unknown) {
+      let messageText = 'No se pudo enviar el comentario';
+      if (err && typeof err === 'object' && 'detail' in err) {
+        const detail = (err as { detail?: { response?: { error?: string } } }).detail;
+        const apiErr = detail?.response?.error;
+        if (apiErr) messageText = String(apiErr);
+      } else if (err instanceof Error) {
+        messageText = err.message;
+      }
+      setError(messageText);
+      setPendingMessages((prev) => prev.filter((m) => m.id !== id));
+      setMsg(content);
     }
   };
 
@@ -283,8 +283,8 @@ export default function CommentsThread({
         <h3 className="text-lg font-serif font-editorial text-ink">Comentarios de la solicitud</h3>
       </div>
 
-      {/* Messages Container */}
-      <div className="flex-1 overflow-y-auto px-6 py-4 space-y-6">
+      {/* Área scroll: min-h-0/min-w-0 para que el flex no comprima el texto a un “columna” de una letra */}
+      <div className="min-h-0 min-w-0 flex-1 space-y-6 overflow-y-auto px-6 py-4">
         {!data && <CommentLoading />}
 
         {groupedMessages.map((group, groupIndex) => (
@@ -301,7 +301,7 @@ export default function CommentsThread({
             ))}
           </CommentMessageGroup>
         ))}
-
+{/*       
         {pendingMessages.length > 0 && (
           <CommentMessageGroup send={true} loading={true}>
             {pendingMessages.map((m) => (
@@ -310,7 +310,7 @@ export default function CommentsThread({
               </CommentMessage>
             ))}
           </CommentMessageGroup>
-        )}
+        )} */}
 
         {newMessageAlert && (
           <button
