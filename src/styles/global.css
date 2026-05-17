@@ -1,6 +1,11 @@
 @import "tailwindcss";
 @plugin '@tailwindcss/typography';
 
+
+* {
+  box-sizing: border-box;
+}
+
 @theme {
   /* ── Editorial Finance — Design Tokens ── */
 
