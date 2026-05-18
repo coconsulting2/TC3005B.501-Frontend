@@ -65,6 +65,18 @@ interface Props {
   token?: string;
 }
 
+function getApiErrorMessage(err: unknown, fallback: string): string {
+  const detail = err && typeof err === "object" && "detail" in err
+    ? (err as { detail?: { response?: { error?: string } } }).detail
+    : undefined;
+
+  if (detail?.response && typeof detail.response.error === "string") {
+    return detail.response.error;
+  }
+
+  return err instanceof Error ? err.message : fallback;
+}
+
 export default function WorkflowRulesAdmin({ token }: Props) {
   const [rules, setRules] = useState<WorkflowRuleDTO[]>([]);
   const [departments, setDepartments] = useState<DepartmentOption[]>([]);
@@ -92,7 +104,7 @@ export default function WorkflowRulesAdmin({ token }: Props) {
       const data = await apiRequest<WorkflowRuleDTO[]>("/workflow-rules", { headers });
       setRules(data);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al cargar reglas.");
+      setError(getApiErrorMessage(err, "Error al cargar reglas."));
     } finally {
       setLoading(false);
     }
@@ -158,7 +170,7 @@ export default function WorkflowRulesAdmin({ token }: Props) {
       await apiRequest(`/workflow-rules/${rule.id}/toggle`, { method: "PATCH", headers });
       await fetchRules();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Error al cambiar estado.");
+      setError(getApiErrorMessage(err, "Error al cambiar estado."));
     }
   };
 
@@ -186,7 +198,7 @@ export default function WorkflowRulesAdmin({ token }: Props) {
       setModalOpen(false);
       await fetchRules();
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : "Error al guardar.");
+      setFormError(getApiErrorMessage(err, "Error al guardar."));
     } finally {
       setSaving(false);
     }

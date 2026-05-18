@@ -14,7 +14,6 @@ const routesAdministracion: string[] = [
   "/admin/catalogo-contable",
   "/admin/indicadores-impuesto",
   "/admin/mapeo-gastos",
-  "/admin/workflow-rules",
   "/reportes/gastos-por-centro",
 ];
 
@@ -88,7 +87,7 @@ export const roleRoutes: Record<UserRole, string[]> = {
     "/autorizar-solicitud/*",
     "/subir-comprobante/*",
   ],
-  Administrador: routesAdministracion,
+  Administrador: [...routesAdministracion, "/admin/workflow-rules"],
   "Admin Ditta": routesAdministracion,
 };
 
