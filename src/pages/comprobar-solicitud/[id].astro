@@ -8,7 +8,7 @@ export const prerender = false;
 import MainLayout from "@layouts/MainLayout.astro";
 import EditorialHeader from "@components/EditorialHeader.astro";
 import AstroButton from "@components/Button.astro";
-import Button from "@components/Button.tsx";
+import ReceiptDetailCard from "@components/ReceiptDetailCard";
 import { getCookie } from "@data/cookies";
 import type { UserRole } from "@type/roles";
 import ValidateReceiptStatus from "@components/ValidateReceiptStatus.tsx";
@@ -46,12 +46,6 @@ try {
   request = null;
 }
 
-const StateColors: Record<string, string> = {
-  'Aprobado': 'status-pill--approved',
-  'Rechazado': 'status-pill--rejected',
-  'Pendiente': 'status-pill--pending',
-};
-
 const requestStatusId = request ? Number(request.request_status_id) : NaN;
 /** Solo en estado 6 (Comprobación gastos del viaje) se puede enviar a validación (PUT send-expense-validation). */
 const canSendForValidation = requestStatusId === 6;
@@ -59,6 +53,18 @@ const canSendForValidation = requestStatusId === 6;
 const alreadySentToAccountsPayable = requestStatusId === 7;
 const canUploadReceipts = request ? requestAllowsReceiptUpload(request.request_status_id) : false;
 const listHref = role === "Cuentas por pagar" ? "/comprobaciones" : "/comprobar-gastos";
+
+// Enrich expenses with file metadata (same as comprobar-gastos)
+const enrichedExpenses = request ? await Promise.all(
+  request.Expenses.map(async (receipt: any) => {
+    try {
+      const fileMap = await apiRequest(`/files/receipt-files/${receipt.receipt_id}`, { cookies: Astro.cookies });
+      return { ...receipt, fileMap };
+    } catch {
+      return { ...receipt, fileMap: null };
+    }
+  })
+) : [];
 ---
 
 <MainLayout title={`Comprobantes de la solicitud #${id}`} data={{ userName, role, buttonLabel }}>
@@ -94,37 +100,33 @@ const listHref = role === "Cuentas por pagar" ? "/comprobaciones" : "/comprobar-
     </EditorialHeader>
 
     <section class="card-editorial overflow-hidden">
-      {request && request.Expenses.length > 0 ? (
+      {enrichedExpenses.length > 0 ? (
         <div>
-          {request.Expenses.map((expense: any, index: number) => {
-            const isLast = index === request!.Expenses.length - 1;
+          {enrichedExpenses.map((expense: any, index: number) => {
+            const isLast = index === enrichedExpenses.length - 1;
             return (
-              <div class={`px-6 py-5 flex items-center justify-between gap-4 ${!isLast ? 'border-b border-[var(--color-neutral-200)]' : ''}`}>
-                <div class="flex items-center gap-4 flex-1 min-w-0">
-                  <span class="font-editorial text-lg text-[var(--color-ink-muted)] tabular-nums w-6 text-right">
-                    {String(index + 1).padStart(2, '0')}
-                  </span>
-                  <div>
-                    <p class="font-medium text-[var(--color-ink)]">{expense.receipt_type_name}</p>
-                    <p class="text-xs text-[var(--color-ink-muted)] mt-0.5">ID: {expense.receipt_id}</p>
-                  </div>
-                </div>
-
-                <span class="money-display text-lg text-[var(--color-ink)]">${expense.amount}</span>
-
-                <div class="flex items-center gap-3">
-                  <span class={`status-pill ${StateColors[expense.validation] || 'status-pill--review'}`}>
-                    {expense.validation}
-                  </span>
-                  {expense.validation === 'Rechazado' && canUploadReceipts && (
-                    <a href={`/resubir-comprobante/${id}?replace=${expense.receipt_id}`}>
-                      <AstroButton variant="border" color="accent">
-                        Resubir
-                      </AstroButton>
-                    </a>
-                  )}
-                </div>
-              </div>
+              <ReceiptDetailCard
+                client:visible
+                index={index}
+                receiptId={expense.receipt_id}
+                receiptTypeName={expense.receipt_type_name}
+                amount={expense.amount}
+                validation={expense.validation}
+                cfdi={expense.cfdi ?? null}
+                pdf={expense.fileMap?.pdf ?? null}
+                xml={expense.fileMap?.xml ?? null}
+                receiptImage={expense.fileMap?.receipt_image ?? null}
+                apiBaseUrl={import.meta.env.PUBLIC_API_BASE_URL}
+                isLast={isLast}
+              >
+                {expense.validation === 'Rechazado' && canUploadReceipts && (
+                  <a href={`/resubir-comprobante/${id}?replace=${expense.receipt_id}`}>
+                    <AstroButton variant="border" color="accent">
+                      Resubir
+                    </AstroButton>
+                  </a>
+                )}
+              </ReceiptDetailCard>
             );
           })}
         </div>

@@ -3,6 +3,7 @@ import { apiRequest } from "@utils/apiClient";
 import ModalWrapper from "@components/ModalWrapper";
 import Toast from "@components/Toast";
 import { showAppAlert } from "@utils/appAlert";
+import type { FlightSearchDefaults } from "@utils/travelRequestAgency";
 
 const IATA_SUGGESTIONS = [
   "MEX",
@@ -46,6 +47,16 @@ export type NormalizedHotelOffer = {
   totalCurrency: string;
   stars: number;
   provider?: string;
+  searchResultId?: string;
+  ratesFetched?: boolean;
+  rates?: Array<{
+    rateId: string;
+    roomName?: string;
+    rateName?: string;
+    totalAmount: number;
+    totalCurrency: string;
+    boardType?: string;
+  }>;
 };
 
 export type HotelSearchDefaults = {
@@ -64,6 +75,8 @@ interface Props {
   needsHotel?: boolean;
   /** Valores iniciales para búsqueda de hospedaje (p. ej. destino y fechas del tramo). */
   hotelSearchDefaults?: HotelSearchDefaults | null;
+  /** Valores iniciales para búsqueda de vuelo desde tramos de la solicitud. */
+  flightSearchDefaults?: FlightSearchDefaults | null;
 }
 
 export default function AttendRequest({
@@ -72,11 +85,17 @@ export default function AttendRequest({
   needsPlane = true,
   needsHotel = false,
   hotelSearchDefaults = null,
+  flightSearchDefaults = null,
 }: Props) {
-  const [origen, setOrigen] = useState("MEX");
-  const [destino, setDestino] = useState("CUN");
-  const [fecha, setFecha] = useState(() => new Date().toISOString().slice(0, 10));
-  const [pasajeros, setPasajeros] = useState(1);
+  const [origen, setOrigen] = useState(() => flightSearchDefaults?.origen ?? "MEX");
+  const [destino, setDestino] = useState(() => flightSearchDefaults?.destino ?? "CUN");
+  const [fecha, setFecha] = useState(
+    () => flightSearchDefaults?.fecha ?? new Date().toISOString().slice(0, 10),
+  );
+  const [fechaRegreso, setFechaRegreso] = useState(
+    () => flightSearchDefaults?.fecha_regreso ?? "",
+  );
+  const [pasajeros, setPasajeros] = useState(() => flightSearchDefaults?.pasajeros ?? 1);
   const [searching, setSearching] = useState(false);
   const [offers, setOffers] = useState<NormalizedFlightOffer[]>([]);
   const [selected, setSelected] = useState<NormalizedFlightOffer | null>(null);
@@ -127,6 +146,7 @@ export default function AttendRequest({
           origen: origen.toUpperCase().slice(0, 3),
           destino: destino.toUpperCase().slice(0, 3),
           fecha,
+          ...(fechaRegreso.trim() ? { fecha_regreso: fechaRegreso.trim() } : {}),
           pasajeros,
         },
         headers: { Authorization: `Bearer ${token}` },
@@ -143,7 +163,7 @@ export default function AttendRequest({
     } finally {
       setSearching(false);
     }
-  }, [origen, destino, fecha, pasajeros, token]);
+  }, [origen, destino, fecha, fechaRegreso, pasajeros, token]);
 
   const buscarHoteles = useCallback(async () => {
     const ciudad = hotelCiudad.trim();
@@ -207,12 +227,32 @@ export default function AttendRequest({
     async (offer: NormalizedHotelOffer) => {
       setSavingHotel(true);
       try {
+        let offerToSave = offer;
+        const searchResultId = offer.searchResultId ?? offer.id;
+        if (offer.provider === "duffel_stays" && searchResultId.startsWith("srr_")) {
+          try {
+            const detail = await apiRequest<{ offer: NormalizedHotelOffer }>(
+              `/hotels/search-results/${encodeURIComponent(searchResultId)}/rates`,
+              {
+                method: "POST",
+                data: { base_offer: offer },
+                headers: { Authorization: `Bearer ${token}` },
+              },
+            );
+            if (detail.offer) {
+              offerToSave = detail.offer;
+            }
+          } catch (rateErr) {
+            console.warn("[hotels] fetch_all_rates no disponible, guardando oferta resumida.", rateErr);
+          }
+        }
+
         await apiRequest(`/travel-agent/travel-request/${request_id}/selected-hotel`, {
           method: "PUT",
-          data: { offer },
+          data: { offer: offerToSave },
           headers: { Authorization: `Bearer ${token}` },
         });
-        setSelectedHotel(offer);
+        setSelectedHotel(offerToSave);
         setToast({ message: "Opción de hospedaje guardada en la solicitud.", type: "success" });
       } catch (e) {
         console.error(e);
@@ -277,7 +317,7 @@ export default function AttendRequest({
       {needsPlane ? (
         <section className="rounded-lg border border-gray-200 p-4 bg-gray-50">
           <h2 className="text-sm font-semibold text-gray-800 mb-3">Buscar vuelos</h2>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-3 items-end">
+          <div className="grid grid-cols-1 md:grid-cols-5 gap-3 items-end">
             <div>
               <label className="block text-xs font-medium text-gray-600 mb-1">Origen (IATA)</label>
               <input
@@ -309,12 +349,23 @@ export default function AttendRequest({
               </datalist>
             </div>
             <div>
-              <label className="block text-xs font-medium text-gray-600 mb-1">Fecha</label>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Fecha ida</label>
               <input
                 type="date"
                 value={fecha}
                 onChange={(e) => setFecha(e.target.value)}
                 className="w-full border border-gray-300 rounded px-2 py-2 text-sm"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-600 mb-1">Fecha regreso</label>
+              <input
+                type="date"
+                value={fechaRegreso}
+                onChange={(e) => setFechaRegreso(e.target.value)}
+                min={fecha}
+                className="w-full border border-gray-300 rounded px-2 py-2 text-sm"
+                title="Opcional — ida y vuelta según la solicitud"
               />
             </div>
             <div>

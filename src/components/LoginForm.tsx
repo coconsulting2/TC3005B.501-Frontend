@@ -8,9 +8,18 @@
  *  • Desktop: 50/50. Panel izq.: self-stretch; md: flex-1 entre hero y pie.
  */
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import { apiRequest } from "@utils/apiClient";
+import { getSession } from "@data/cookies";
 import Button from "@components/Button";
+
+/** Cookies en el dominio del frontend (4321); el middleware Astro las lee en SSR. */
+function setSessionCookie(name: string, value: string) {
+  if (value == null || value === "") return;
+  const secure =
+    typeof window !== "undefined" && window.location.protocol === "https:" ? "; Secure" : "";
+  document.cookie = `${name}=${encodeURIComponent(String(value))}; path=/; SameSite=Strict${secure}`;
+}
 
 /* ── Tokens ── */
 const COLOR_BG_DARK = "#0A0A0A";
@@ -127,9 +136,23 @@ export default function LoginForm() {
   const [showPassword, setShowPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
+  useEffect(() => {
+    const { role } = getSession();
+    if (role) {
+      window.location.replace("/dashboard");
+    }
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    await apiRequest("/user/logout", { method: "GET" });
+    const hadSession = Boolean(getSession().role || getSession().token);
+    if (hadSession) {
+      try {
+        await apiRequest("/user/logout", { method: "GET" });
+      } catch {
+        /* continuar con login nuevo */
+      }
+    }
 
     try {
       const data: { username: string; password: string; organization_id?: string } = {
@@ -145,11 +168,13 @@ export default function LoginForm() {
       });
 
       setErrorMessage("");
-      document.cookie = `token=${response.token}; path=/; secure; SameSite=Strict`;
-      document.cookie = `role=${response.role}; path=/`;
-      document.cookie = `username=${response.username}; path=/`;
-      document.cookie = `user_id=${response.user_id}; path=/`;
-      document.cookie = `department_id=${response.department_id}; path=/`;
+      setSessionCookie("token", response.token);
+      setSessionCookie("role", response.role);
+      setSessionCookie("username", response.username);
+      setSessionCookie("user_id", String(response.user_id));
+      if (response.department_id != null && response.department_id !== "") {
+        setSessionCookie("department_id", String(response.department_id));
+      }
       window.location.href = "/dashboard";
     } catch (error: any) {
       const resData = error?.response?.data;
