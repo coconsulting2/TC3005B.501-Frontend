@@ -14,6 +14,7 @@ const routesAdministracion: string[] = [
   "/admin/catalogo-contable",
   "/admin/indicadores-impuesto",
   "/admin/mapeo-gastos",
+  "/admin/workflow-rules",
   "/reportes/gastos-por-centro",
 ];
 

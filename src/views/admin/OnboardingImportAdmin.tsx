@@ -692,6 +692,85 @@ function PreviewPanel({
         <strong style={{ color: T.ink }}>{preview.strategy}</strong>
       </p>
 
+      {/* ── Catálogos detectados en CSV multi-sección ── */}
+      {preview.societies && preview.societies.length > 0 && (
+        <details
+          style={{
+            marginBottom: 16,
+            padding: "12px 14px",
+            background: T.surfaceMuted,
+            border: `1px solid ${T.border}`,
+            borderRadius: 8,
+            fontSize: 13,
+            color: T.inkSecondary,
+          }}
+        >
+          <summary style={{ cursor: "pointer", fontWeight: 600, color: T.ink }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 18, verticalAlign: "middle", marginRight: 6 }}>domain</span>
+            Sociedades contables detectadas ({preview.societies.length})
+          </summary>
+          <p style={{ margin: "8px 0", fontSize: 12, color: T.inkMuted }}>
+            Se crearán o actualizarán al importar.
+          </p>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, marginTop: 4 }}>
+            <thead>
+              <tr style={{ background: T.headerBg }}>
+                {["Código", "Nombre"].map((h) => (
+                  <th key={h} style={{ padding: "6px 10px", textAlign: "left", fontWeight: 600, color: T.inkSecondary, borderBottom: `1px solid ${T.border}` }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {preview.societies.map((s, i) => (
+                <tr key={s.code} style={{ background: i % 2 === 0 ? T.surface : T.rowAlt }}>
+                  <td style={{ padding: "6px 10px", fontFamily: "ui-monospace, monospace", fontSize: 12 }}>{s.code}</td>
+                  <td style={{ padding: "6px 10px" }}>{s.name}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </details>
+      )}
+
+      {preview.departments && preview.departments.length > 0 && (
+        <details
+          style={{
+            marginBottom: 16,
+            padding: "12px 14px",
+            background: T.surfaceMuted,
+            border: `1px solid ${T.border}`,
+            borderRadius: 8,
+            fontSize: 13,
+            color: T.inkSecondary,
+          }}
+        >
+          <summary style={{ cursor: "pointer", fontWeight: 600, color: T.ink }}>
+            <span className="material-symbols-outlined" style={{ fontSize: 18, verticalAlign: "middle", marginRight: 6 }}>account_tree</span>
+            Centros de costos detectados ({preview.departments.length})
+          </summary>
+          <p style={{ margin: "8px 0", fontSize: 12, color: T.inkMuted }}>
+            Se crearán o actualizarán como departamentos al importar.
+          </p>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, marginTop: 4 }}>
+            <thead>
+              <tr style={{ background: T.headerBg }}>
+                {["CeCo", "Departamento"].map((h) => (
+                  <th key={h} style={{ padding: "6px 10px", textAlign: "left", fontWeight: 600, color: T.inkSecondary, borderBottom: `1px solid ${T.border}` }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {preview.departments.map((d, i) => (
+                <tr key={d.costsCenter} style={{ background: i % 2 === 0 ? T.surface : T.rowAlt }}>
+                  <td style={{ padding: "6px 10px", fontFamily: "ui-monospace, monospace", fontSize: 12 }}>{d.costsCenter}</td>
+                  <td style={{ padding: "6px 10px" }}>{d.departmentName}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </details>
+      )}
+
       {preview.validRows > 0 && (
         <div
           style={{
