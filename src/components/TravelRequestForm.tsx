@@ -632,7 +632,7 @@ export default function TravelRequestForm({ data, mode, request_id, user_id, rol
           type="button" 
           onClick={handleResetForm} 
           variant="border"
-          color="secondary"
+          color="accent"
           disabled={disabledButton}
         >
           Limpiar Formulario
