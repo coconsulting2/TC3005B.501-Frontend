@@ -23,11 +23,12 @@ const role: UserRole = getCookie("role", Astro.cookies) as UserRole;
 const userName = getCookie("username", Astro.cookies);
 const buttonLabel = roleLabels[role];
 
-/** BD: 2 = Primera Revisión (pendiente N1), 3 = Segunda Revisión (pendiente N2). */
+/** BD: 2 = Primera Revisión (pendiente N1), 3 = Segunda Revisión (pendiente N2).
+ * Inbox filtra por aprobador esperado en `workflow_pre_snapshot` (no por dept). */
 const status = getCookie("role", Astro.cookies) === "N1" ? 2 : 3;
 const requests = await (async () => {
   try {
-    return await apiRequest(`/user/get-travel-requests/${getCookie("department_id", Astro.cookies)}/${status}`, { cookies: Astro.cookies });
+    return await apiRequest(`/user/get-approver-requests/${status}`, { cookies: Astro.cookies });
   } catch (error) {
     return [];
   }

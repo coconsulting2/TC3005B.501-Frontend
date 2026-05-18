@@ -87,7 +87,7 @@ export const roleRoutes: Record<UserRole, string[]> = {
     "/autorizar-solicitud/*",
     "/subir-comprobante/*",
   ],
-  Administrador: routesAdministracion,
+  Administrador: [...routesAdministracion, "/admin/workflow-rules"],
   "Admin Ditta": routesAdministracion,
 };
 

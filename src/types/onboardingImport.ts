@@ -5,6 +5,16 @@
  *   POST /api/onboarding/import/apply
  */
 
+export interface ImportSociety {
+  code: string;
+  name: string;
+}
+
+export interface ImportDepartment {
+  costsCenter: string;
+  departmentName: string;
+}
+
 export interface PermissionCatalogItem {
   code: string;
   action: string;
@@ -87,6 +97,10 @@ export interface PreviewImportResponse {
   rolesCatalog?: RoleCatalogEntry[];
   errors: ImportValidationError[];
   conflicts: ImportConflict[];
+  /** Sociedades contables detectadas en CSV multi-sección. */
+  societies?: ImportSociety[];
+  /** Centros de costos / departamentos detectados en CSV multi-sección. */
+  departments?: ImportDepartment[];
   /** Datos del bloque `organization` en JSON (si existen). */
   organizationFromFile?: {
     nombre: string;

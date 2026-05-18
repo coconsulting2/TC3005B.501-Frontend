@@ -1,5 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { apiRequest } from "@utils/apiClient";
+import { clearSessionCookies } from "@data/cookies";
+import { clearPermissionCache } from "@stores/permissionStore";
 
 interface LogoutButtonProps {
   children?: React.ReactNode;
@@ -10,9 +12,12 @@ export default function LogoutButton({ children }: LogoutButtonProps) {
   const confirmRef = useRef<HTMLDivElement>(null);
 
   const handleLogout = async () => {
-    await apiRequest("/user/logout", {
-      method: "GET",
-    });
+    try {
+      await apiRequest("/user/logout", { method: "GET" });
+    } finally {
+      clearSessionCookies();
+      clearPermissionCache();
+    }
     window.location.href = "/login";
   };
 
