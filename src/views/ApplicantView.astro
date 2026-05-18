@@ -26,22 +26,23 @@ const statusMap: { [key: string]: string } = {
 
 const user_id = getCookie("id", Astro.cookies);
 
-const requests = await (async () => {
+type FetchError = { status?: number; message?: string };
+const _fetchResult: { error: FetchError | null; data: any[] } = { error: null, data: [] };
+{
   try {
-    try {
-      const allRequests = await apiRequest(`/applicant/get-user-requests/${user_id}`, {
-        cookies: Astro.cookies
-      });
-      return allRequests.filter((request: any) => request.status !== "Borrador");
-    } catch (apiError) {
-      console.error("Error fetching requests:", apiError);
-      return [];
-    }
-  } catch (error) {
-    console.error("Error in request handling:", error);
-    return [];
+    const allRequests = await apiRequest(`/applicant/get-user-requests/${user_id}`, {
+      cookies: Astro.cookies
+    });
+    _fetchResult.data = allRequests.filter((r: any) => r.status !== "Borrador");
+  } catch (apiError: any) {
+    const status: number | undefined = apiError?.detail?.status ?? apiError?.status;
+    const message: string = apiError?.detail?.response?.error ?? apiError?.message ?? String(apiError);
+    _fetchResult.error = { status, message };
+    console.error(`[ApplicantView] GET /get-user-requests/${user_id} failed — status: ${status}, error: ${message}`);
   }
-})();
+}
+const requests = _fetchResult.data;
+const fetchError: FetchError | null = _fetchResult.error;
 
 const { userName } = Astro.props;
 
@@ -170,6 +171,12 @@ const toVerify = requests.filter((r: any) =>
 
     {requests.length === 0 && (
       <div class="card-editorial py-16 text-center">
+        {import.meta.env.DEV && fetchError?.message && (
+          <div class="mb-4 rounded border border-red-400 bg-red-50 p-4 text-left text-sm text-red-800">
+            <strong>Error al cargar solicitudes (solo visible en dev):</strong>
+            <pre class="mt-1 whitespace-pre-wrap">{fetchError.status ? `HTTP ${fetchError.status}: ` : ""}{fetchError.message}</pre>
+          </div>
+        )}
         <p class="text-[var(--color-ink-muted)]">No tienes viajes agendados</p>
         <a href="/crear-solicitud" class="mt-4 inline-block">
           <Button variant="filled" color="primary" size="medium">

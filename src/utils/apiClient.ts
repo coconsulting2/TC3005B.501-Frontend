@@ -66,8 +66,6 @@ async function getCsrfToken(): Promise<string> {
   return csrfTokenPromise;
 }
 
-// Handle SSL certificate validation for server-side (Node.js) environment
-// This is needed for Astro SSR to work with self-signed certificates
 const isServer = typeof window === 'undefined';
 // `astro dev` → DEV true; build + preview o SSR en Docker puede tener DEV false pero NODE_ENV=development.
 const isDevelopment =
@@ -75,9 +73,52 @@ const isDevelopment =
   import.meta.env.MODE === "development" ||
   (typeof process !== "undefined" && process.env.NODE_ENV === "development");
 
-// In development server environment, disable certificate validation
-if (isServer && isDevelopment && typeof process !== "undefined") {
-  process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+/**
+ * En SSR + desarrollo, Bun no siempre respeta NODE_TLS_REJECT_UNAUTHORIZED para su fetch nativo.
+ * Esta función usa node:https con rejectUnauthorized:false como fallback garantizado.
+ */
+async function fetchWithInsecureTls(url: string, init: RequestInit): Promise<Response> {
+  try {
+    const https = await import("node:https");
+    const parsedUrl = new URL(url);
+    const agent = new https.Agent({ rejectUnauthorized: false });
+
+    const body = init.body as string | undefined;
+    const rawHeaders = (init.headers ?? {}) as Record<string, string>;
+
+    return new Promise<Response>((resolve, reject) => {
+      const req = https.request(
+        {
+          hostname: parsedUrl.hostname,
+          port: parsedUrl.port || 443,
+          path: parsedUrl.pathname + parsedUrl.search,
+          method: init.method || "GET",
+          headers: rawHeaders,
+          agent,
+        },
+        (res) => {
+          const chunks: Buffer[] = [];
+          res.on("data", (chunk: Buffer) => chunks.push(chunk));
+          res.on("end", () => {
+            const responseBody = Buffer.concat(chunks);
+            resolve(
+              new Response(responseBody, {
+                status: res.statusCode ?? 200,
+                headers: res.headers as HeadersInit,
+              })
+            );
+          });
+        }
+      );
+      req.on("error", reject);
+      if (body) req.write(body);
+      req.end();
+    });
+  } catch {
+    // node:https not available — fall back to global fetch with env-var bypass
+    process.env.NODE_TLS_REJECT_UNAUTHORIZED = "0";
+    return fetch(url, init);
+  }
 }
 
 type HTTP = "GET" | "POST" | "PUT" | "PATCH" | "DELETE";
@@ -135,10 +176,11 @@ export async function apiRequest<T = any>(
     ...(data && { body: JSON.stringify(data) }),
   };
 
+  const fullUrl = `${baseUrl}${path}`;
   try {
-    // For Node.js in development, the NODE_TLS_REJECT_UNAUTHORIZED env var handles this
-    // For browsers, we can't directly modify SSL validation behavior
-    const res = await fetch(`${baseUrl}${path}`, config);
+    const res = isServer && isDevelopment
+      ? await fetchWithInsecureTls(fullUrl, config)
+      : await fetch(fullUrl, config);
 
     if (!res.ok) {
       const bodyText = await res.text();
@@ -176,20 +218,11 @@ export async function apiRequest<T = any>(
       };
     }
     const errMsg = error instanceof Error ? error.message : String(error);
-    const lower = errMsg.toLowerCase();
-    const isUnreachable =
-      error instanceof TypeError ||
-      lower.includes("failed to fetch") ||
-      lower.includes("networkerror") ||
-      errMsg.includes("ERR_CONNECTION_REFUSED");
-    const baseHint = resolveApiBaseUrl();
     throw {
       message: "Network or fetch error",
       detail: {
         response: {
-          error: isUnreachable
-            ? `No hay conexión con la API (${baseHint}). Inicia el backend en ese host/puerto y revisa PUBLIC_API_BASE_URL si usas otro origen.`
-            : errMsg,
+          error: `${fullUrl} → ${errMsg}`,
         },
         raw: error,
       },
