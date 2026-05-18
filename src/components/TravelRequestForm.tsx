@@ -5,6 +5,7 @@ import type { FormData } from '@/types/FormData';
 import type { DepartmentData } from '@/types/DepartmentData';
 import RouteInputGroup from '@/components/RouteInputGroup';
 import Toast from '@/components/Toast';
+import Button from '@/components/Button';
 
 interface Props {
   data?: FormData;
@@ -43,6 +44,7 @@ export default function TravelRequestForm({ data, mode, request_id, user_id, rol
   const [error, setError] = useState<string | null>(null);
   const [disabledButton, setDisabledButton] = useState<boolean>(false);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
+  const [displayFee, setDisplayFee] = useState<string>('');
 
   const inputStyle = 'border border-gray-300 p-2 rounded w-full bg-white';
   useEffect(() => {
@@ -59,6 +61,14 @@ export default function TravelRequestForm({ data, mode, request_id, user_id, rol
         routes: transformedRoutes,
       };
       setFormData(newData);
+      
+      // Init display fee
+      if (newData.requested_fee && newData.requested_fee !== 0) {
+        const val = parseFloat(newData.requested_fee as string);
+        if (!isNaN(val)) {
+          setDisplayFee(`$${val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+        }
+      }
     }
   }, [data]);
 
@@ -540,7 +550,30 @@ export default function TravelRequestForm({ data, mode, request_id, user_id, rol
         <h3 className="text-lg font-semibold text-gray-700">Detalles Generales del Viaje</h3>
         <div>
           <label className="block text-sm font-medium mb-1">Anticipo Esperado (MXN)<span className="text-red-500"> *</span></label>
-          <input name="requested_fee" placeholder="Anticipo Esperado (MXN)" type="number" className={inputStyle} value={formData.requested_fee === 0 ? '' : formData.requested_fee} onChange={handleGeneralChange} required />
+          <input 
+            name="requested_fee" 
+            placeholder="Ej. $15,000.00" 
+            type="text" 
+            className={inputStyle} 
+            value={displayFee} 
+            onChange={(e) => {
+              const val = e.target.value.replace(/[^0-9.]/g, '');
+              setFormData(prev => ({...prev, requested_fee: val}));
+              setDisplayFee(e.target.value);
+            }}
+            onBlur={() => {
+              const val = parseFloat(formData.requested_fee as string);
+              if (!isNaN(val)) {
+                 setDisplayFee(`$${val.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`);
+              } else {
+                 setDisplayFee('');
+              }
+            }}
+            onFocus={() => {
+              setDisplayFee(formData.requested_fee ? String(formData.requested_fee) : '');
+            }}
+            required 
+          />
         </div>
         <div>
           <label className="block text-sm font-medium mb-1">Observaciones / Comentarios<span className="text-red-500"> *</span></label>
@@ -594,53 +627,73 @@ export default function TravelRequestForm({ data, mode, request_id, user_id, rol
         </div>
       )}
 
-      <div className="flex flex-col sm:flex-row justify-end gap-3">
-        <button type="button" onClick={handleResetForm} className="disabled:bg-gray-400 disabled:cursor-not-allowed bg-red-500 text-white px-6 py-2 rounded-md shadow hover:bg-red-600 transition-colors"
+      <div className="flex flex-col sm:flex-row justify-end gap-3 pt-4">
+        <Button 
+          type="button" 
+          onClick={handleResetForm} 
+          variant="border"
+          color="secondary"
           disabled={disabledButton}
         >
           Limpiar Formulario
-        </button>
+        </Button>
         {mode == 'create' && (
           <div className='flex gap-3'>
-            <button type="button" onClick={handleSaveDraft} className="disabled:bg-gray-400 disabled:cursor-not-allowed bg-gray-500 text-white px-6 py-2 rounded-md shadow hover:bg-gray-600 transition-colors"
+            <Button 
+              type="button" 
+              onClick={handleSaveDraft} 
+              variant="border"
+              color="primary"
               disabled={disabledButton}
             >
               Guardar Borrador
-            </button>
-            <button type="button" onClick={handleSubmitRequest} className="disabled:bg-gray-400 disabled:cursor-not-allowed bg-green-600 text-white px-6 py-2 rounded-md shadow hover:bg-green-700 transition-colors"
+            </Button>
+            <Button 
+              type="button" 
+              onClick={handleSubmitRequest} 
+              variant="filled"
+              color="success"
               disabled={disabledButton}
             >
               Enviar Solicitud
-            </button>
+            </Button>
           </div>
         )}
         {mode == 'edit' && (
-          <button type="button"
+          <Button 
+            type="button"
             onClick={async (e) => {
               await handleEditRequest(e as unknown as React.FormEvent, true, '/dashboard');
             }}
-            className="disabled:bg-gray-400 disabled:cursor-not-allowed bg-blue-600 text-white px-6 py-2 rounded-md shadow hover:bg-blue-700 transition-colors"
+            variant="filled"
+            color="primary"
             disabled={disabledButton}
           >
             Actualizar Solicitud
-          </button>
+          </Button>
         )}
         {mode == 'draft' && (
           <div className='flex gap-3'>
-            <button type="button"
+            <Button 
+              type="button"
               onClick={async (e) => {
                 await handleEditRequest(e as unknown as React.FormEvent, false, '/solicitudes-draft');
               }}
-              className="disabled:bg-gray-400 disabled:cursor-not-allowed bg-gray-500 text-white px-6 py-2 rounded-md shadow hover:bg-gray-600 transition-colors"
+              variant="border"
+              color="primary"
               disabled={disabledButton}
             >
               Guardar Cambios
-            </button>
-            <button type="button" onClick={handleFinishDraft} className="disabled:bg-gray-400 disabled:cursor-not-allowed bg-green-600 text-white px-6 py-2 rounded-md shadow hover:bg-green-700 transition-colors"
+            </Button>
+            <Button 
+              type="button" 
+              onClick={handleFinishDraft} 
+              variant="filled"
+              color="success"
               disabled={disabledButton}
             >
               Enviar Solicitud
-            </button>
+            </Button>
           </div>
         )}
         {toast && <Toast message={toast.message} type={toast.type} />}

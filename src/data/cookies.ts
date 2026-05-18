@@ -107,3 +107,23 @@ type CookieKey = Exclude<keyof Session, "permissions">;
 export function getCookie(key: CookieKey, cookies?: APIContext["cookies"]): string {
   return getSession(cookies)[key] ?? "";
 }
+
+const SESSION_COOKIE_NAMES = [
+  "token",
+  "role",
+  "username",
+  "user_id",
+  "id",
+  "department_id",
+  "no_empleado",
+] as const;
+
+/** Borra cookies de sesión en el dominio del frontend (tras logout en API). */
+export function clearSessionCookies(): void {
+  if (typeof document === "undefined") return;
+  const expires = "Thu, 01 Jan 1970 00:00:00 GMT";
+  for (const name of SESSION_COOKIE_NAMES) {
+    document.cookie = `${name}=; path=/; expires=${expires}; SameSite=Strict`;
+    document.cookie = `${name}=; path=/; expires=${expires}; SameSite=Strict; Secure`;
+  }
+}

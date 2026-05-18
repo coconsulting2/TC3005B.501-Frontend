@@ -1,6 +1,12 @@
 ---
 import LoginForm from "@components/LoginForm";
 import Layout from "@layouts/Layout.astro";
+import { getCookie } from "@data/cookies";
+
+const role = getCookie("role", Astro.cookies);
+if (role) {
+  return Astro.redirect("/dashboard");
+}
 ---
 
 <Layout title="Iniciar sesión — CocoConsulting">
