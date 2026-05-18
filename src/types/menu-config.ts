@@ -59,6 +59,8 @@ export const SIDEBAR_CONFIG: Record<string, MenuItem[]> = {
     { label: 'CATÁLOGO CONTABLE', route: '/admin/catalogo-contable', icon: 'account_balance' },
     { label: 'INDICADORES DE IMPUESTO', route: '/admin/indicadores-impuesto', icon: 'percent' },
     { label: 'MAPEO DE GASTOS', route: '/admin/mapeo-gastos', icon: 'sync_alt' },
+    // Workflow rules — solo admin de org, no super-admin Ditta
+    { label: 'REGLAS DE WORKFLOW', route: '/admin/workflow-rules', icon: 'rule_settings' },
     // M3-009 — Dashboard de gasto por centro de costos
     { label: 'GASTO POR CC', route: '/reportes/gastos-por-centro', icon: 'insights' }
   ],

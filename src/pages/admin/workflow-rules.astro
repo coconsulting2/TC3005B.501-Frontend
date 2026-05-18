@@ -1,0 +1,29 @@
+---
+/**
+ * /admin/workflow-rules — Administración de reglas de flujo de aprobación.
+ * Solo visible para el Administrador de cada organización (workflow:manage).
+ */
+
+import EditorialHeader from "@components/EditorialHeader.astro";
+import MainLayout from "@layouts/MainLayout.astro";
+import WorkflowRulesAdmin from "@views/admin/WorkflowRulesAdmin";
+import { getCookie } from "@data/cookies";
+import { roleLabels } from "@config/role-labels";
+import type { UserRole } from "@type/roles";
+
+const role: UserRole = getCookie("role", Astro.cookies) as UserRole;
+const buttonLabel = roleLabels[role];
+const userName = getCookie("username", Astro.cookies);
+const token = getCookie("token", Astro.cookies);
+---
+
+<MainLayout title="Reglas de Workflow" data={{ userName, buttonLabel, role }}>
+  <div>
+    <EditorialHeader
+      eyebrow="Coco / Administración / Reglas de Workflow"
+      title="Reglas de aprobación"
+      subtitle="Configura cuántos niveles de jefatura, umbrales por importe y revisores fijos (ej. CxP) necesita cada departamento para aprobar solicitudes."
+    />
+    <WorkflowRulesAdmin client:only="react" token={token} />
+  </div>
+</MainLayout>
