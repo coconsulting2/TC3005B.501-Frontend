@@ -311,6 +311,7 @@ export default function WorkflowRulesAdmin({ token }: Props) {
                       onClick={() => openEdit(rule)}
                       style={{ border: "none", background: "transparent", cursor: "pointer", color: T.primary, padding: 4 }}
                       title="Editar"
+                      aria-label="Editar regla"
                     >
                       <span className="material-symbols-outlined" style={{ fontSize: 20 }}>edit</span>
                     </button>
