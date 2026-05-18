@@ -1,7 +1,8 @@
 import React, { useState, useRef } from "react";
 import FileDropZone from "@components/FileDropZone";
 import type { FileDropZoneHandle, ReceiptUploadResponse } from "@components/FileDropZone";
-import CfdiDevPreview, { isDevTaxPreviewEnabled } from "@components/CfdiDevPreview";
+import { isDevTaxPreviewEnabled } from "@components/CfdiDevPreview";
+import UploadSuccessCard from "@components/UploadSuccessCard";
 import Button from "@components/Button.tsx";
 import { submitTravelExpense } from "@components/SubmitTravelWarper";
 import ModalWrapper from "@components/ModalWrapper.tsx";
@@ -87,6 +88,7 @@ export default function ExpensesFormClient({ requestId, token, receiptToReplace 
   const [devRegistroResponse, setDevRegistroResponse] = useState<unknown | null>(null);
   const [devRegistroError, setDevRegistroError] = useState<string | null>(null);
   const [uploadSuccess, setUploadSuccess] = useState(false);
+  const [completedConcepto, setCompletedConcepto] = useState("");
   // M2-006 RF-44 — preview de política y modal de excepción
   const [policyPreview, setPolicyPreview] = useState<PolicyPreviewResult | null>(null);
   const [showExceptionModal, setShowExceptionModal] = useState(false);
@@ -280,14 +282,9 @@ export default function ExpensesFormClient({ requestId, token, receiptToReplace 
         }
       }
 
-      if (showDevPanel) {
-        setDevUploadResult(uploadRes);
-        setDevReceiptId(lastReceiptId);
-        setUploadSuccess(true);
-        setSubmitting(false);
-        return;
-      }
-
+      setDevUploadResult(uploadRes);
+      setDevReceiptId(lastReceiptId);
+      setCompletedConcepto(concepto);
       setUploadSuccess(true);
       setSubmitting(false);
     } catch (err) {
@@ -298,37 +295,17 @@ export default function ExpensesFormClient({ requestId, token, receiptToReplace 
 
   if (uploadSuccess) {
     return (
-      <div className="space-y-6 rounded-[var(--radius-md)] border border-[var(--color-neutral-200)] bg-[var(--color-surface-secondary)] p-6">
-        <p className="text-sm font-medium text-[var(--color-ink)]">
-          Comprobante registrado correctamente.
-        </p>
-        <p className="text-xs text-[var(--color-ink-muted)]">
-          Ya puedes revisar tus comprobantes o volver al inicio. No es necesario volver a subir el mismo archivo.
-        </p>
-        <div className="flex flex-wrap gap-3 pt-2">
-          <a
-            href="/dashboard"
-            className="inline-flex items-center justify-center rounded-[var(--radius-md)] bg-primary-500 px-4 py-2.5 text-sm font-medium text-white hover:bg-primary-600 transition-colors"
-          >
-            Ir al dashboard
-          </a>
-          <a
-            href={`/comprobar-solicitud/${requestId}`}
-            className="inline-flex items-center justify-center rounded-[var(--radius-md)] border border-[var(--color-neutral-300)] bg-[var(--color-surface-white)] px-4 py-2.5 text-sm font-medium text-[var(--color-ink)] hover:bg-[var(--color-surface-secondary)] transition-colors"
-          >
-            Volver a comprobantes
-          </a>
-        </div>
-        {showDevPanel && devReceiptId != null && devUploadResult != null && (
-          <CfdiDevPreview
-            requestId={requestId}
-            receiptId={devReceiptId}
-            apiBaseUrl={API_BASE_URL}
-            upload={devUploadResult}
-            registroResponse={devRegistroResponse}
-            registroError={devRegistroError}
-          />
-        )}
+      <div className="rounded-[var(--radius-md)] border border-[var(--color-neutral-200)] bg-[var(--color-surface-secondary)] p-6">
+        <UploadSuccessCard
+          requestId={requestId}
+          receiptId={devReceiptId ?? 0}
+          concepto={completedConcepto}
+          apiBaseUrl={API_BASE_URL}
+          uploadResult={devUploadResult}
+          registroResponse={devRegistroResponse as Record<string, unknown> | null}
+          registroError={devRegistroError}
+          isInternational={isInternational}
+        />
       </div>
     );
   }

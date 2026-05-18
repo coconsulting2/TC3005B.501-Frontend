@@ -1,12 +1,13 @@
 ---
 /**
  * Author: Eduardo Porto Morales
+ * Cuentas por pagar — aprobación de monto (sin UI de agencia/Duffel).
  */
 
 export const prerender = false;
 import MainLayout from "@layouts/MainLayout.astro";
 import RequestDetail from "@components/RequestDetail.astro";
-import AttendRequest from "@components/AttendRequest";
+import CxpQuoteRequest from "@components/CxpQuoteRequest";
 import type { UserRole } from "@type/roles";
 
 import { getCookie } from "@data/cookies";
@@ -19,10 +20,7 @@ const token = getCookie("token", Astro.cookies);
 const userId = getCookie("id", Astro.cookies);
 
 import { apiRequest } from "@/utils/apiClient";
-import {
-  buildHotelSearchDefaults,
-  computeAgencyServiceFlags,
-} from "@/utils/travelRequestAgency";
+import { computeAgencyServiceFlags } from "@/utils/travelRequestAgency";
 
 const { id } = Astro.params;
 let request = null;
@@ -35,7 +33,7 @@ try {
 }
 
 const { needsPlane, needsHotel } = computeAgencyServiceFlags(request.routes);
-const hotelSearchDefaults = buildHotelSearchDefaults(request.routes);
+const requestedFee = Number(request.requested_fee) || 0;
 ---
 
 <MainLayout title={`Solicitud #${request.request_id}`} data={{ userName, buttonLabel, role }} >
@@ -46,14 +44,14 @@ const hotelSearchDefaults = buildHotelSearchDefaults(request.routes);
     currentUserId={userId ? parseInt(String(userId), 10) : undefined}
     authToken={token}
   />
-  <div class="flex mt-8">
-    <AttendRequest
+  <div class="w-full min-w-0 mt-8">
+    <CxpQuoteRequest
       client:only="react"
       request_id={String(request.request_id)}
-      token={getCookie("token", Astro.cookies)}
+      requested_fee={requestedFee}
+      token={token ?? ""}
       needsPlane={needsPlane}
       needsHotel={needsHotel}
-      hotelSearchDefaults={hotelSearchDefaults}
     />
   </div>
 </MainLayout>

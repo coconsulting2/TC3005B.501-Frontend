@@ -7,6 +7,7 @@ export const prerender = false;
 import MainLayout from "@layouts/MainLayout.astro";
 import EditorialHeader from "@components/EditorialHeader.astro";
 import ReceiptActions from "@components/ReceiptActions";
+import ReceiptDetailCard from "@components/ReceiptDetailCard";
 import type { UserRole } from "@type/roles";
 import FinishRequestButton from "@components/FinisCheck.tsx";
 
@@ -40,12 +41,6 @@ const enrichedExpenses = await Promise.all(
   })
 );
 const allReviewed = enrichedExpenses.every((receipt: any) => receipt.validation !== "Pendiente");
-
-const validationPill: Record<string, string> = {
-  "Aprobado": "status-pill--approved",
-  "Rechazado": "status-pill--rejected",
-  "Pendiente": "status-pill--pending",
-};
 ---
 
 <MainLayout title={`Solicitud #${request.request_id}`} data={{ userName, buttonLabel, role }}>
@@ -76,59 +71,30 @@ const validationPill: Record<string, string> = {
       ) : (
         <div>
           {enrichedExpenses.map((receipt: any, index: number) => {
-            const pdf = receipt.fileMap?.pdf;
-            const xml = receipt.fileMap?.xml;
             const isLast = index === enrichedExpenses.length - 1;
-
             return (
-              <div class={`px-6 py-5 ${!isLast ? 'border-b border-[var(--color-neutral-200)]' : ''}`}>
-                <div class="flex items-start justify-between gap-6">
-                  <!-- Receipt info -->
-                  <div class="flex items-center gap-4 flex-1">
-                    <span class="font-editorial text-lg text-[var(--color-ink-muted)] tabular-nums w-6 text-right">
-                      {String(index + 1).padStart(2, '0')}
-                    </span>
-                    <div>
-                      <p class="font-medium text-[var(--color-ink)]">#{receipt.receipt_id}</p>
-                      <div class="flex gap-4 mt-1 text-sm text-[var(--color-ink-secondary)]">
-                        <span>Monto: <span class="money-display">{receipt.amount} MXN</span></span>
-                        <span>Rubro: {receipt.receipt_type_name}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <!-- Status + Actions column -->
-                  <div class="flex flex-col items-end gap-2">
-                    <span class={`status-pill ${validationPill[receipt.validation] || 'status-pill--review'}`}>
-                      {receipt.validation}
-                    </span>
-                  </div>
-                </div>
-
-                <!-- File downloads + Receipt actions -->
-                <div class="flex items-center gap-3 mt-3 ml-10">
-                  {pdf && (
-                    <a href={`${import.meta.env.PUBLIC_API_BASE_URL}/files/receipt-file/${pdf.fileId}`}
-                      class="px-3 py-1.5 text-xs font-medium border border-[var(--color-neutral-300)] rounded-[var(--radius-md)] text-[var(--color-ink-secondary)] hover:bg-[var(--color-surface-secondary)] transition-colors">
-                      PDF: {pdf.fileName}
-                    </a>
-                  )}
-                  {xml && (
-                    <a href={`${import.meta.env.PUBLIC_API_BASE_URL}/files/receipt-file/${xml.fileId}`}
-                      class="px-3 py-1.5 text-xs font-medium border border-[var(--color-neutral-300)] rounded-[var(--radius-md)] text-[var(--color-ink-secondary)] hover:bg-[var(--color-surface-secondary)] transition-colors">
-                      XML: {xml.fileName}
-                    </a>
-                  )}
-
-                  <ReceiptActions
-                    client:only="react"
-                    receipt_id={receipt.receipt_id}
-                    expense_status={receipt.expense_status}
-                    disabled={receipt.validation !== "Pendiente"}
-                    token={getCookie("token", Astro.cookies)}
-                  />
-                </div>
-              </div>
+              <ReceiptDetailCard
+                client:visible
+                index={index}
+                receiptId={receipt.receipt_id}
+                receiptTypeName={receipt.receipt_type_name}
+                amount={receipt.amount}
+                validation={receipt.validation}
+                cfdi={receipt.cfdi ?? null}
+                pdf={receipt.fileMap?.pdf ?? null}
+                xml={receipt.fileMap?.xml ?? null}
+                receiptImage={receipt.fileMap?.receipt_image ?? null}
+                apiBaseUrl={import.meta.env.PUBLIC_API_BASE_URL}
+                isLast={isLast}
+              >
+                <ReceiptActions
+                  client:only="react"
+                  receipt_id={receipt.receipt_id}
+                  expense_status={receipt.expense_status}
+                  disabled={receipt.validation !== "Pendiente"}
+                  token={getCookie("token", Astro.cookies)}
+                />
+              </ReceiptDetailCard>
             );
           })}
         </div>

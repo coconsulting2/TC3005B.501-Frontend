@@ -12,25 +12,34 @@ function matchPath(path: string, patterns: string[]) {
 }
 export const publicRoutes = [ '/login', '/404' ];
 
+function readCookieFromHeader(cookieHeader: string, name: string): string {
+  const escaped = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const match = cookieHeader.match(new RegExp(`(?:^|;\\s*)${escaped}=([^;]*)`));
+  return match ? decodeURIComponent(match[1].trim()) : '';
+}
+
 export const onRequest: MiddlewareHandler = async (context, next) => {
   const { request } = context;
   const url = new URL(request.url);
   const pathname = url.pathname;
-  
-  // 1. Permitir rutas públicas sin autenticación
+  const cookieHeader = request.headers.get('cookie') || '';
+  const role = readCookieFromHeader(cookieHeader, 'role');
+  const token = readCookieFromHeader(cookieHeader, 'token');
+  const isAuthenticated = Boolean(role || token);
+
+  // 1. Rutas públicas
   if (matchPath(pathname, publicRoutes)) {
+    // Ya autenticado → no mostrar login otra vez
+    if (pathname === '/login' && isAuthenticated) {
+      return Response.redirect(new URL('/dashboard', request.url), 302);
+    }
     return next();
   }
   
-  // 2. Obtener el rol desde las cookies
-  const cookieHeader = request.headers.get('cookie') || '';
-  const roleMatch = cookieHeader.match(/(?:^|;\s*)role=([^;]+)/);
-  const role = roleMatch ? decodeURIComponent(roleMatch[1]) : '';
-  const tokenMatch = cookieHeader.match(/(?:^|;\s*)token=([^;]+)/);
-  const isAuthenticated = !!tokenMatch || !!role; // Consider authenticated if role exists
+  // 2. Sesión requerida (rol en cookies del frontend; ver LoginForm / login.astro)
   const html = unauthorizedPage(pathname, isAuthenticated);
 
-  // 2.1 Si no hay rol, redirigir a la página de inicio de sesión
+  // 2.1 Sin rol → login
   if (!role) {
     return Response.redirect(new URL('/login', request.url), 302);
   }
