@@ -378,7 +378,7 @@ export default function ExpensesFormClient({ requestId, token, receiptToReplace 
           onChange={(e) => setIsInternational(e.target.checked)}
           className="accent-primary-400"
         />
-        Es viaje internacional
+        Es en moneda extranjera
       </label>
 
       {isInternational && (
