@@ -51,6 +51,7 @@ export const roleRoutes: Record<UserRole, string[]> = {
     "/comprobar-gastos",
     "/comprobar-gastos/*",
     "/comprobar-solicitud/*",
+    "/detalles-solicitud/*",
   ],
   N1: [
     "/dashboard",
