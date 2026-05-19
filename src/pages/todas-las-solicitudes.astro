@@ -1,0 +1,49 @@
+---
+/**
+ * Author: Antigravity
+ * Updated: Editorial Finance design system
+ */
+
+import MainLayout from "@layouts/MainLayout.astro";
+import EditorialHeader from "@components/EditorialHeader.astro";
+import CxPAllRequestsList from "@/components/RequestsLists/CxPAllRequestsList";
+import TableFallback from "@/components/Table/TableFallback.astro";
+
+import type { UserRole } from "@type/roles";
+import { getCookie } from "@data/cookies";
+import { roleLabels } from "@config/role-labels";
+import { apiRequest } from '@utils/apiClient';
+
+const role: UserRole = getCookie("role", Astro.cookies) as UserRole;
+const userName = getCookie("username", Astro.cookies);
+const buttonLabel = roleLabels[role];
+
+const requests = await (async () => {
+  try {
+    return await apiRequest(`/accounts-payable/requests`, { cookies: Astro.cookies });
+  } catch (error) {
+    return [];
+  }
+})();
+---
+
+<MainLayout title="Todas las solicitudes" data={{ userName, buttonLabel, role }}>
+  <div>
+    {requests && requests.length === 0 ? (
+      <div class="mt-8 text-center">
+        <p class="text-sm text-[var(--color-ink-muted)]">No hay solicitudes en la organización.</p>
+      </div>
+    ) : (
+      <EditorialHeader
+        eyebrow="Coco / Finanzas / Historial General"
+        title="Todas las Solicitudes"
+        subtitle="Visualiza el historial completo de solicitudes de la organización"
+      />
+      <CxPAllRequestsList
+        client:only="react"
+        data={requests}
+        role={role}
+      />
+    )}
+  </div>
+</MainLayout>

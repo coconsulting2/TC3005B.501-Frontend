@@ -120,11 +120,13 @@ const enrichedExpenses = request ? await Promise.all(
                 isLast={isLast}
               >
                 {expense.validation === 'Rechazado' && canUploadReceipts && (
-                  <a href={`/resubir-comprobante/${id}?replace=${expense.receipt_id}`}>
-                    <AstroButton variant="border" color="accent">
-                      Resubir
-                    </AstroButton>
-                  </a>
+                  <div class="mt-3 ml-10 flex items-center gap-3">
+                    <a href={`/resubir-comprobante/${id}?replace=${expense.receipt_id}`}>
+                      <AstroButton variant="border" color="accent">
+                        Resubir
+                      </AstroButton>
+                    </a>
+                  </div>
                 )}
               </ReceiptDetailCard>
             );
