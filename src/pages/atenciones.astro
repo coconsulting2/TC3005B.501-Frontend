@@ -1,12 +1,13 @@
 ---
 /**
  * Author: Diego Ortega Fernandez
- * Updated: Editorial Finance design system
+ * Updated: Editorial Finance design system + listado de canceladas (estado 9)
  */
 
 import MainLayout from "@layouts/MainLayout.astro";
 import EditorialHeader from "@components/EditorialHeader.astro";
 import AuthRequestsList from "@/components/RequestsLists/AuthRequestsList";
+import RequestSection from "@components/RequestSection.astro";
 import TableFallback from "@/components/Table/TableFallback.astro";
 
 import type { UserRole } from "@type/roles";
@@ -17,32 +18,58 @@ import { apiRequest } from "@/utils/apiClient";
 const role: UserRole = getCookie("role", Astro.cookies) as UserRole;
 const userName = getCookie("username", Astro.cookies);
 const buttonLabel = roleLabels[role];
+const deptId = getCookie("department_id", Astro.cookies);
 
-const status = 5;
 const requests = await (async () => {
   try {
-    return await apiRequest(`/user/get-travel-requests/${getCookie("department_id", Astro.cookies)}/${status}`, { cookies: Astro.cookies });
+    return await apiRequest(`/user/get-travel-requests/${deptId}/5`, { cookies: Astro.cookies });
   } catch (error) {
     return [];
   }
 })();
+
+const cancelled = await (async () => {
+  try {
+    return await apiRequest(`/user/get-travel-requests/${deptId}/9`, { cookies: Astro.cookies });
+  } catch (error) {
+    return [];
+  }
+})();
+
+const hasAny = requests.length > 0 || cancelled.length > 0;
 ---
 
-<MainLayout title="Atenciones pendientes" data={{ userName, buttonLabel, role }}>
+<MainLayout title="Atenciones" data={{ userName, buttonLabel, role }}>
   <div>
-    {requests && requests.length === 0 ? (
+    {!hasAny ? (
       <TableFallback />
     ) : (
-      <EditorialHeader
-        eyebrow="Coco / Agencia / Atenciones"
-        title={`Atenciones de ${userName}`}
-        subtitle="Solicitudes pendientes de atender"
-      />
-      <AuthRequestsList
-        client:only="react"
-        data={requests}
-        role={role}
-      />
+      <>
+        <EditorialHeader
+          eyebrow="Coco / Agencia / Atenciones"
+          title={`Atenciones de ${userName}`}
+          subtitle="Pendientes y viajes cancelados"
+        />
+
+        {requests.length > 0 && (
+          <section class="mb-10">
+            <AuthRequestsList
+              client:only="react"
+              data={requests}
+              role={role}
+            />
+          </section>
+        )}
+
+        <RequestSection
+          title="Viajes cancelados"
+          requests={cancelled}
+          anchor="atenciones"
+          urlBase="atender-solicitud"
+          subtitle="Cancelado — revisa si ya habías reservado"
+          emptyMessage="No hay viajes cancelados"
+        />
+      </>
     )}
   </div>
 </MainLayout>
