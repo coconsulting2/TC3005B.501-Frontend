@@ -21,7 +21,7 @@ export const SIDEBAR_CONFIG: Record<string, MenuItem[]> = {
     { label: 'DRAFT SOLICITUDES', route: '/solicitudes-draft', icon: 'draft' },
     { label: 'GASTOS (COMPROBAR)', route: '/comprobar-gastos', icon: 'payments' },
     { label: 'REEMBOLSOS', route: '/reembolso', icon: 'paid' },
-    { label: 'GASTO POR CC', route: '/reportes/gastos-por-centro', icon: 'insights' },
+    // { label: 'GASTO POR CC', route: '/reportes/gastos-por-centro', icon: 'insights' },
     { label: 'HISTORIAL DE VIAJES', route: '/historial', icon: 'inventory' }
   ],
   'N2': [
@@ -32,7 +32,7 @@ export const SIDEBAR_CONFIG: Record<string, MenuItem[]> = {
     { label: 'DRAFT SOLICITUDES', route: '/solicitudes-draft', icon: 'draft' },
     { label: 'GASTOS (COMPROBAR)', route: '/comprobar-gastos', icon: 'payments' },
     { label: 'REEMBOLSOS', route: '/reembolso', icon: 'paid' },
-    { label: 'GASTO POR CC', route: '/reportes/gastos-por-centro', icon: 'insights' },
+    // { label: 'GASTO POR CC', route: '/reportes/gastos-por-centro', icon: 'insights' },
     { label: 'HISTORIAL DE VIAJES', route: '/historial', icon: 'inventory' }
   ],
   'Cuentas por pagar': [
