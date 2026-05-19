@@ -151,8 +151,21 @@ export default function ExpensesFormClient({ requestId, token, receiptToReplace 
       setDevRegistroResponse(null);
       setDevRegistroError(null);
 
-      if (!concepto || !monto || isNaN(parseFloat(monto)) || !pdfFile || (!isInternational && !xmlFile)) {
-        showAppAlert("Por favor, completa todos los campos correctamente.", { variant: "warning" });
+      const getValidationError = () => {
+        if (!concepto) return "El concepto es obligatorio.";
+        if (!monto) return "El monto gastado es obligatorio.";
+        if (isNaN(parseFloat(monto))) return "El monto debe ser un número válido.";
+        if (!pdfFile) {
+           if (isInternational) return "Debes adjuntar el comprobante en jpg o png."
+           return "Debes adjuntar el comprobante en pdf."
+        }
+        if (!isInternational && !xmlFile) return "Debes adjuntar el archivo XML.";
+        return null;
+      };
+
+      const error = getValidationError();
+      if (error) {
+        showAppAlert(error, { variant: "warning" });
         setSubmitting(false);
         return;
       }
