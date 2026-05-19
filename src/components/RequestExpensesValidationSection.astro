@@ -1,26 +1,26 @@
 ---
 /**
  * Comprobantes de gastos con detalle CFDI/archivos y acciones CxP.
- * Usado en detalle de solicitud y en la pantalla dedicada de validación.
+ * Incluye vista previa de liquidación (aprobados vs anticipo).
  */
 import ReceiptActions from "@components/ReceiptActions";
 import ReceiptDetailCard from "@components/ReceiptDetailCard";
 import FinishRequestButton from "@components/FinisCheck.tsx";
+import ExpenseSettlementSummary from "@components/ExpenseSettlementSummary";
 import { getCookie } from "@data/cookies";
 import { apiRequest } from "@/utils/apiClient";
 import {
   enrichExpensesWithFiles,
   type ExpenseValidationApiRow,
 } from "@/utils/receiptExpenseRows";
+import { computeExpenseSettlement } from "@/utils/expenseSettlement";
 
 interface Props {
   requestId: number;
-  /** Aprobar / rechazar comprobantes (estado 7). */
   enableActions?: boolean;
-  /** Enlace a /comprobar-gastos/:id */
   showDedicatedLink?: boolean;
-  /** Botón finalizar solicitud cuando todos revisados. */
   showFinishButton?: boolean;
+  finishRedirectTo?: string;
 }
 
 const {
@@ -28,6 +28,7 @@ const {
   enableActions = false,
   showDedicatedLink = false,
   showFinishButton = false,
+  finishRedirectTo = "/comprobaciones",
 } = Astro.props as Props;
 
 const authToken = getCookie("token", Astro.cookies);
@@ -46,12 +47,29 @@ try {
   expensePayload = null;
 }
 
+let travelFees = { requested_fee: 0, imposed_fee: 0 };
+try {
+  const travel = await apiRequest(`/applicant/get-user-request/${requestId}`, {
+    cookies: Astro.cookies,
+  });
+  travelFees = {
+    requested_fee: Number(travel.requested_fee) || 0,
+    imposed_fee: Number(travel.imposed_fee) || 0,
+  };
+} catch {
+  travelFees = { requested_fee: 0, imposed_fee: 0 };
+}
+
 const expenses = Array.isArray(expensePayload?.Expenses) ? expensePayload.Expenses : [];
 const receiptRows = await enrichExpensesWithFiles(expenses, Astro.cookies);
+
+const settlement = computeExpenseSettlement(receiptRows, travelFees);
 
 const allReviewed =
   receiptRows.length > 0 &&
   receiptRows.every((r) => r.validation !== "Pendiente");
+
+const showSettlementPanel = receiptRows.length > 0;
 ---
 
 <section class="card-editorial overflow-hidden mt-8">
@@ -73,6 +91,8 @@ const allReviewed =
           client:only="react"
           requestId={expensePayload.request_id}
           token={authToken ?? ""}
+          settlement={settlement}
+          redirectTo={finishRedirectTo}
         />
       )}
       {showDedicatedLink && (
@@ -99,37 +119,49 @@ const allReviewed =
       </p>
     </div>
   ) : (
-    <div>
-      {receiptRows.map((receipt, index) => (
-        <ReceiptDetailCard
-          client:visible
-          index={index}
-          receiptId={receipt.receipt_id}
-          receiptTypeName={receipt.receipt_type_name}
-          amount={receipt.amount}
-          validation={receipt.validation}
-          cfdi={receipt.cfdi}
-          pdf={receipt.pdf}
-          xml={receipt.xml}
-          receiptImage={receipt.receipt_image}
-          apiBaseUrl={import.meta.env.PUBLIC_API_BASE_URL}
-          isLast={index === receiptRows.length - 1}
-        >
-          {enableActions && expensePayload && (
-            <div class="mt-3 ml-10 flex items-center gap-3">
-              <ReceiptActions
-                client:only="react"
-                receipt_id={receipt.receipt_id}
-                request_id={expensePayload.request_id}
-                receipt_type_name={receipt.receipt_type_name}
-                expense_status={receipt.expense_status}
-                disabled={receipt.validation !== "Pendiente"}
-                token={authToken ?? ""}
-              />
-            </div>
-          )}
-        </ReceiptDetailCard>
-      ))}
-    </div>
+    <>
+      {showSettlementPanel && (
+        <div class="px-4 sm:px-6 pt-4 sm:pt-5 border-b border-[var(--color-neutral-200)]">
+          <ExpenseSettlementSummary
+            client:visible
+            settlement={settlement}
+            variant={enableActions ? "preview" : "preview"}
+          />
+        </div>
+      )}
+
+      <div>
+        {receiptRows.map((receipt, index) => (
+          <ReceiptDetailCard
+            client:visible
+            index={index}
+            receiptId={receipt.receipt_id}
+            receiptTypeName={receipt.receipt_type_name}
+            amount={receipt.amount}
+            validation={receipt.validation}
+            cfdi={receipt.cfdi}
+            pdf={receipt.pdf}
+            xml={receipt.xml}
+            receiptImage={receipt.receipt_image}
+            apiBaseUrl={import.meta.env.PUBLIC_API_BASE_URL}
+            isLast={index === receiptRows.length - 1}
+          >
+            {enableActions && expensePayload && (
+              <div class="mt-3 ml-10 flex items-center gap-3">
+                <ReceiptActions
+                  client:only="react"
+                  receipt_id={receipt.receipt_id}
+                  request_id={expensePayload.request_id}
+                  receipt_type_name={receipt.receipt_type_name}
+                  expense_status={receipt.expense_status}
+                  disabled={receipt.validation !== "Pendiente"}
+                  token={authToken ?? ""}
+                />
+              </div>
+            )}
+          </ReceiptDetailCard>
+        ))}
+      </div>
+    </>
   )}
 </section>
