@@ -264,11 +264,7 @@ export default function ReceiptDetailCard({
       )}
 
       {/* ── Actions slot (children) ── */}
-      {children && (
-        <div className="mt-3 ml-10 flex items-center gap-3">
-          {children}
-        </div>
-      )}
+      {children}
     </div>
   );
 }
