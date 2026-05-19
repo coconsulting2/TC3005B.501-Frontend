@@ -27,6 +27,10 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
   const token = readCookieFromHeader(cookieHeader, 'token');
   const isAuthenticated = Boolean(role || token);
 
+  if (url.pathname === "/") {
+    return Response.redirect("/login");
+  }
+
   // 1. Rutas públicas
   if (matchPath(pathname, publicRoutes)) {
     // Ya autenticado → no mostrar login otra vez
