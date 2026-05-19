@@ -69,6 +69,8 @@ interface FileDropZoneProps {
   /** Called on upload error */
   onUploadError?: (error: string) => void;
   className?: string;
+  /** When true, show red outlines for missing files (used by parent on submit attempt) */
+  showMissingHighlight?: boolean;
 }
 
 /* ── Helpers ── */
@@ -273,7 +275,8 @@ const FileDropZone = forwardRef<FileDropZoneHandle, FileDropZoneProps>(function 
     onUploadComplete,
     onUploadError,
     className = "",
-  },
+    showMissingHighlight = false,
+  }: FileDropZoneProps,
   ref
 ) {
   const [state, setState] = useState<DropZoneState>("idle");
@@ -415,6 +418,7 @@ const FileDropZone = forwardRef<FileDropZoneHandle, FileDropZoneProps>(function 
 
   const needsPdf = !pdfFile;
   const needsXml = !isInternational && !xmlFile;
+  const shouldHighlight: boolean = Boolean(showMissingHighlight) || Boolean(className && className.includes("show-missing"));
 
   return (
     <div className={`w-full ${className}`}>
@@ -426,6 +430,7 @@ const FileDropZone = forwardRef<FileDropZoneHandle, FileDropZoneProps>(function 
           transition-all duration-200 cursor-pointer min-h-[160px]
           ${stateStyles[displayState]}
           ${state === "uploading" ? "cursor-default" : ""}
+          ${shouldHighlight && (needsPdf || needsXml) ? " border-accent-400" : ""}
         `}
         role="button"
         aria-label={isInternational ? "Zona de carga de imagen del recibo" : "Zona de carga de archivos PDF y XML"}
@@ -441,6 +446,7 @@ const FileDropZone = forwardRef<FileDropZoneHandle, FileDropZoneProps>(function 
             needsPdf={needsPdf}
             needsXml={needsXml}
             isInternational={isInternational}
+            showMissingHighlight={shouldHighlight}
           />
         )}
         {displayState === "uploading" && <UploadingContent progress={progress} />}
@@ -513,12 +519,14 @@ function SelectedContent({
   needsPdf,
   needsXml,
   isInternational,
+  showMissingHighlight,
 }: {
   pdfName: string | null;
   xmlName: string | null;
   needsPdf: boolean;
   needsXml: boolean;
   isInternational: boolean;
+  showMissingHighlight?: boolean;
 }) {
   return (
     <div className="w-full max-w-none mx-auto px-0 sm:px-2">
@@ -527,9 +535,10 @@ function SelectedContent({
           label={isInternational ? "Imagen" : "PDF"}
           fileName={pdfName}
           missing={needsPdf}
+          showMissingHighlight={showMissingHighlight}
         />
         {!isInternational && (
-          <FileChip label="XML" fileName={xmlName} missing={needsXml} />
+          <FileChip label="XML" fileName={xmlName} missing={needsXml} showMissingHighlight={showMissingHighlight} />
         )}
         {isInternational && !xmlName && (
           <p className="text-xs text-[var(--color-ink-muted)] text-center mt-1 sm:col-span-2">
@@ -546,12 +555,14 @@ function SelectedContent({
   );
 }
 
-function FileChip({ label, fileName, missing }: { label: string; fileName: string | null; missing: boolean }) {
+function FileChip({ label, fileName, missing, showMissingHighlight }: { label: string; fileName: string | null; missing: boolean; showMissingHighlight?: boolean }) {
   return (
     <div
       className={`w-full grid grid-cols-[auto_auto_minmax(0,1fr)] items-center gap-2 px-3 py-2 rounded-[var(--radius-md)] border text-sm min-w-0 ${
         missing
-          ? "border-dashed border-[var(--color-neutral-300)] text-[var(--color-ink-muted)]"
+          ? (showMissingHighlight
+              ? "border-dashed border-accent-400 text-accent-500"
+              : "border-dashed border-[var(--color-neutral-300)] text-[var(--color-ink-muted)]")
           : "border-success-200 bg-success-50/50 text-success-500"
       }`}
     >
