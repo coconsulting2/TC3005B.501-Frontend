@@ -248,15 +248,15 @@ export default function CommentsThread({
                     </CommentMessageGroup>
                 ))}
 
-                {pendingMessages.length > 0 && (
-                    <CommentMessageGroup send={true} name={name} loading={true}>
-                        {pendingMessages.map((m) => (
-                            <CommentMessage key={m.id} time={formatTime(new Date().toISOString())}>
-                                {m.msg}
-                            </CommentMessage>
-                        ))}
-                    </CommentMessageGroup>
-                )}
+                {/*{pendingMessages.length > 0 && (*/}
+                {/*    <CommentMessageGroup send={true} name={name} loading={true}>*/}
+                {/*        {pendingMessages.map((m) => (*/}
+                {/*            <CommentMessage key={m.id} time={formatTime(new Date().toISOString())}>*/}
+                {/*                {m.msg}*/}
+                {/*            </CommentMessage>*/}
+                {/*        ))}*/}
+                {/*    </CommentMessageGroup>*/}
+                {/*)}*/}
 
                 {newMessageAlert && (
                     <button
