@@ -408,7 +408,7 @@ export default function LoginForm() {
                 required
                 placeholder="nombre@ditta.com.mx"
                 value={username}
-                onChange={(e) => setUsername(e.target.value)}
+                onChange={(e) => setUsername(e.target.value.toLowerCase())}
                 style={inputStyle}
                 onFocus={handleFocus}
                 onBlur={handleBlur}

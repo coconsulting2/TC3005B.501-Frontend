@@ -142,7 +142,7 @@ const enrichedExpenses = request ? await Promise.all(
     </section>
   </main>
 
-  <div class="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-2 max-w-sm">
+  <div class="fixed bottom-6 right-6 z-50 flex flex-col items-end gap-2 max-w-3/12">
     {alreadySentToAccountsPayable && (
       <div
         class="text-xs text-right bg-[var(--color-surface-white)] border border-success-200 rounded-[var(--radius-md)] px-3 py-2 shadow-sm"
@@ -156,17 +156,17 @@ const enrichedExpenses = request ? await Promise.all(
     )}
     {!alreadySentToAccountsPayable && !canSendForValidation && requestStatusId > 7 && (
       <p class="text-xs text-[var(--color-ink-muted)] text-right bg-[var(--color-surface-white)] border border-[var(--color-neutral-200)] rounded-[var(--radius-md)] px-3 py-2 shadow-sm">
-        La solicitud ya avanzó de fase; mandar a validar no aplica.
+        La solicitud ya avanzó de fase; mandar a validar no aplica
         {request?.request_status_name && (
-          <> Estado actual: <strong>{request.request_status_name}</strong>.</>
+          <><br>Estado actual: <strong>{request.request_status_name}</strong></>
         )}
       </p>
     )}
     {!alreadySentToAccountsPayable && !canSendForValidation && requestStatusId < 6 && (
       <p class="text-xs text-[var(--color-ink-muted)] text-right bg-[var(--color-surface-white)] border border-[var(--color-neutral-200)] rounded-[var(--radius-md)] px-3 py-2 shadow-sm">
-        Solo puedes mandar a validar cuando la solicitud está en <strong>Comprobación gastos del viaje</strong>.
+        Solo puedes mandar a validar cuando la solicitud está en <strong>Comprobación gastos del viaje</strong>
         {request?.request_status_name && (
-          <> Estado actual: <strong>{request.request_status_name}</strong>.</>
+          <><br>Estado actual: <strong>{request.request_status_name}</strong></>
         )}
       </p>
     )}
@@ -182,7 +182,7 @@ const enrichedExpenses = request ? await Promise.all(
         disabled={!canSendForValidation}
         token={getCookie("token", Astro.cookies)}
       >
-        Mandar a validar
+        Mandar para validación
       </ValidateReceiptStatus>
     )}
   </div>

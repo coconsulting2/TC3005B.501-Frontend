@@ -19,13 +19,37 @@ const currentPath = Astro.url.pathname;
 const items = SIDEBAR_CONFIG[role] ?? [];
 ---
 
-<aside class="relative w-56 h-full bg-[var(--color-surface-white)] border-r border-[var(--color-neutral-200)]">
-  <button id="sidebar-close" class="md:hidden absolute top-3 right-3 w-11 h-11 flex items-center justify-center rounded-[var(--radius-md)] hover:bg-[var(--color-surface-secondary)] transition-colors">
-    <span class="material-icons text-[var(--color-ink-muted)]">close</span>
+<aside
+  id="sidebar-panel"
+  data-collapsed="false"
+  class="relative flex h-full w-64 md:w-72 flex-col overflow-hidden bg-surface-white border-r border-neutral-200 transition-[width] duration-300 ease-in-out"
+>
+  <div class="flex items-start justify-between gap-3 px-3 pt-4">
+    <p class="sidebar-eyebrow eyebrow px-3 mb-0">Navegación</p>
+
+    <button
+      id="sidebar-toggle"
+      type="button"
+      class="hidden md:flex h-10 w-10 shrink-0 items-center justify-center rounded-md hover:bg-(--color-surface-secondary) transition-colors"
+      aria-controls="sidebar-panel"
+      aria-expanded="true"
+      aria-label="Colapsar barra lateral"
+    >
+      <span id="sidebar-toggle-icon" class="material-symbols-outlined text-ink-muted">chevron_left</span>
+    </button>
+  </div>
+
+  <button
+    id="sidebar-close"
+    type="button"
+    class="md:hidden absolute top-3 right-3 w-11 h-11 flex items-center justify-center rounded-md hover:bg-(--color-surface-secondary) transition-colors"
+    aria-label="Cerrar barra lateral"
+  >
+    <span class="material-symbols-outlined text-ink-muted">close</span>
   </button>
-  <div class="h-full px-3 py-6 overflow-auto">
-    <p class="eyebrow px-3 mb-4">Navegación</p>
-    <ul class="space-y-1 font-medium list-none p-0 m-0">
+
+  <div class="flex-1 px-3 py-4 overflow-auto">
+    <ul class="sidebar-nav space-y-1 font-medium list-none p-0 m-0">
       {
         items.map((item) => {
           const isActive = currentPath.startsWith(item.route);
@@ -41,8 +65,88 @@ const items = SIDEBAR_CONFIG[role] ?? [];
 </aside>
 
 <script>
-  document.getElementById('sidebar-close')?.addEventListener('click', () => {
-    document.getElementById('sidebar')?.classList.remove('open');
-    document.getElementById('sidebar-overlay')?.classList.remove('open');
+  const sidebar = document.getElementById('sidebar');
+  const overlay = document.getElementById('sidebar-overlay');
+  const panel = document.getElementById('sidebar-panel');
+  const toggle = document.getElementById('sidebar-toggle');
+  const toggleIcon = document.getElementById('sidebar-toggle-icon');
+  const closeButton = document.getElementById('sidebar-close');
+  const desktopMedia = window.matchMedia('(min-width: 768px)');
+
+  const setCollapsed = (collapsed: boolean) => {
+    if (!panel || !toggle || !toggleIcon) return;
+
+    panel.dataset.collapsed = collapsed ? 'true' : 'false';
+    toggle.setAttribute('aria-expanded', String(!collapsed));
+    toggle.setAttribute('aria-label', collapsed ? 'Expandir barra lateral' : 'Colapsar barra lateral');
+    toggleIcon.textContent = collapsed ? 'chevron_right' : 'chevron_left';
+
+    try {
+      localStorage.setItem('sidebar-collapsed', collapsed ? 'true' : 'false');
+    } catch {
+      // Ignore storage issues and keep the current UI state.
+    }
+  };
+
+  const syncDesktopState = () => {
+    if (!panel || !toggle || !toggleIcon) return;
+
+    if (!desktopMedia.matches) {
+      panel.dataset.collapsed = 'false';
+      toggle.setAttribute('aria-expanded', 'true');
+      toggle.setAttribute('aria-label', 'Colapsar barra lateral');
+      toggleIcon.textContent = 'chevron_left';
+      return;
+    }
+
+    let storedCollapsed = false;
+    try {
+      storedCollapsed = localStorage.getItem('sidebar-collapsed') === 'true';
+    } catch {
+      storedCollapsed = false;
+    }
+
+    setCollapsed(storedCollapsed);
+  };
+
+  toggle?.addEventListener('click', () => {
+    if (!desktopMedia.matches) return;
+    setCollapsed(panel?.dataset.collapsed !== 'true');
   });
+
+  closeButton?.addEventListener('click', () => {
+    sidebar?.classList.remove('open');
+    overlay?.classList.remove('open');
+  });
+
+  syncDesktopState();
+  desktopMedia.addEventListener('change', syncDesktopState);
 </script>
+
+<style is:global>
+  #sidebar-panel[data-collapsed='true'] {
+    width: 5rem;
+  }
+
+  #sidebar-panel[data-collapsed='true'] .sidebar-eyebrow {
+    display: none;
+  }
+
+  #sidebar-panel[data-collapsed='true'] .sidebar-action {
+    justify-content: center;
+    gap: 0;
+    padding-left: 0;
+    padding-right: 0;
+  }
+
+  #sidebar-panel[data-collapsed='true'] .sidebar-label {
+    display: none;
+  }
+
+  @media (max-width: 767px) {
+    #sidebar-panel {
+      width: 16rem !important;
+    }
+  }
+</style>
+

@@ -75,6 +75,7 @@ interface Props {
 export default function ExpensesFormClient({ requestId, token, receiptToReplace }: Props) {
   const [concepto, setConcepto] = useState("Transporte");
   const [monto, setMonto] = useState("");
+  const [showValidation, setShowValidation] = useState(false);
   const [pdfFile, setPdfFile] = useState<File | null>(null);
   const [xmlFile, setXmlFile] = useState<File | null>(null);
   const [isInternational, setIsInternational] = useState(false);
@@ -145,14 +146,36 @@ export default function ExpensesFormClient({ requestId, token, receiptToReplace 
 
   const handleSubmit = async () => {
     try {
+      setShowValidation(true);
       setSubmitting(true);
       setDevUploadResult(null);
       setDevReceiptId(null);
       setDevRegistroResponse(null);
       setDevRegistroError(null);
 
-      if (!concepto || !monto || isNaN(parseFloat(monto)) || !pdfFile || (!isInternational && !xmlFile)) {
-        showAppAlert("Por favor, completa todos los campos correctamente.", { variant: "warning" });
+      const getValidationErrors = (): string[] => {
+        const errors: string[] = [];
+
+        if (!concepto) errors.push("El concepto es obligatorio.");
+        if (!monto) errors.push("El monto gastado es obligatorio.");
+        else if (isNaN(parseFloat(monto))) errors.push("El monto gastado debe ser un número válido.");
+
+        if (!pdfFile) {
+          errors.push(
+              isInternational
+                  ? "Debes adjuntar el comprobante en JPG o PNG."
+                  : "Debes adjuntar el comprobante en PDF."
+          );
+        }
+
+        if (!isInternational && !xmlFile) errors.push("Debes adjuntar el archivo XML.");
+
+        return errors;
+      };
+
+      const errors: string[] = getValidationErrors();
+      if (errors.length > 0) {
+        showAppAlert(errors.join(" "), { variant: "warning" });
         setSubmitting(false);
         return;
       }
@@ -348,7 +371,11 @@ export default function ExpensesFormClient({ requestId, token, receiptToReplace 
             id="monto"
             type="number"
             step="0.01"
-            className="w-full border border-[var(--color-neutral-300)] rounded-[var(--radius-md)] px-3 py-2.5 text-sm bg-[var(--color-surface-white)] text-[var(--color-ink)] placeholder:text-[var(--color-ink-subtle)] focus:outline-none focus:ring-2 focus:ring-primary-200 focus:border-primary-400 transition-colors"
+            className={`${
+              showValidation && (!monto || isNaN(parseFloat(monto)))
+                ? "w-full border border-accent-400 rounded-[var(--radius-md)] px-3 py-2.5 text-sm bg-[var(--color-surface-white)] text-[var(--color-ink)] placeholder:text-[var(--color-ink-subtle)] focus:outline-none focus:ring-2 focus:ring-primary-200 focus:border-primary-400 transition-colors"
+                : "w-full border border-[var(--color-neutral-300)] rounded-[var(--radius-md)] px-3 py-2.5 text-sm bg-[var(--color-surface-white)] text-[var(--color-ink)] placeholder:text-[var(--color-ink-subtle)] focus:outline-none focus:ring-2 focus:ring-primary-200 focus:border-primary-400 transition-colors"
+            }`}
             placeholder="Ej. 443.50"
             value={monto}
             onChange={(e) => setMonto(e.target.value)}
@@ -365,7 +392,7 @@ export default function ExpensesFormClient({ requestId, token, receiptToReplace 
           onChange={(e) => setIsInternational(e.target.checked)}
           className="accent-primary-400"
         />
-        Es viaje internacional
+        Es en moneda extranjera
       </label>
 
       {isInternational && (
@@ -417,6 +444,7 @@ export default function ExpensesFormClient({ requestId, token, receiptToReplace 
         isInternational={isInternational}
         onPdfChange={setPdfFile}
         onXmlChange={onXmlFileChange}
+        className={showValidation ? "show-missing" : ""}
       />
 
       {/* M2-006 RF-44 — Alerta de política. Solo visible cuando hay preview que excedió. */}
