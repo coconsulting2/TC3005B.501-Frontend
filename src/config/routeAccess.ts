@@ -42,6 +42,7 @@ export const roleRoutes: Record<UserRole, string[]> = {
   "Cuentas por pagar": [
     "/dashboard",
     "/perfil-usuario",
+    "/todas-las-solicitudes",
     "/cotizaciones",
     "/comprobaciones",
     "/exportar-contable",
