@@ -9,7 +9,7 @@ export const SIDEBAR_CONFIG: Record<string, MenuItem[]> = {
     { label: 'DASHBOARD', route: '/dashboard', icon: 'home' },
     { label: 'CREAR SOLICITUD', route: '/crear-solicitud', icon: 'flight' },
     { label: 'DRAFT SOLICITUDES', route: '/solicitudes-draft', icon: 'draft' },
-    { label: 'COMPROBAR GASTOS', route: '/comprobar-gastos', icon: 'payments' },
+    { label: 'GASTOS (COMPROBAR)', route: '/comprobar-gastos', icon: 'payments' },
     { label: 'REEMBOLSOS', route: '/reembolso', icon: 'paid' },
     { label: 'HISTORIAL DE VIAJES', route: '/historial', icon: 'inventory' }
   ],
@@ -19,7 +19,7 @@ export const SIDEBAR_CONFIG: Record<string, MenuItem[]> = {
     { label: 'SOLICITUDES', route: '/solicitudes-autorizador', icon: 'check_box' },
     { label: 'CREAR SOLICITUD', route: '/crear-solicitud', icon: 'flight' },
     { label: 'DRAFT SOLICITUDES', route: '/solicitudes-draft', icon: 'draft' },
-    { label: 'COMPROBAR GASTOS', route: '/comprobar-gastos', icon: 'payments' },
+    { label: 'GASTOS (COMPROBAR)', route: '/comprobar-gastos', icon: 'payments' },
     { label: 'REEMBOLSOS', route: '/reembolso', icon: 'paid' },
     { label: 'GASTO POR CC', route: '/reportes/gastos-por-centro', icon: 'insights' },
     { label: 'HISTORIAL DE VIAJES', route: '/historial', icon: 'inventory' }
@@ -30,7 +30,7 @@ export const SIDEBAR_CONFIG: Record<string, MenuItem[]> = {
     { label: 'SOLICITUDES', route: '/solicitudes-autorizador', icon: 'check_box' },
     { label: 'CREAR SOLICITUD', route: '/crear-solicitud', icon: 'flight' },
     { label: 'DRAFT SOLICITUDES', route: '/solicitudes-draft', icon: 'draft' },
-    { label: 'COMPROBAR GASTOS', route: '/comprobar-gastos', icon: 'payments' },
+    { label: 'GASTOS (COMPROBAR)', route: '/comprobar-gastos', icon: 'payments' },
     { label: 'REEMBOLSOS', route: '/reembolso', icon: 'paid' },
     { label: 'GASTO POR CC', route: '/reportes/gastos-por-centro', icon: 'insights' },
     { label: 'HISTORIAL DE VIAJES', route: '/historial', icon: 'inventory' }
