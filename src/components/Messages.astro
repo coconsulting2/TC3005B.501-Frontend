@@ -15,13 +15,21 @@ const statusByRole = {
 type UserRole = keyof typeof statusByRole;
 const userRole = getCookie("role", Astro.cookies) as UserRole;
 const status = statusByRole[userRole];
-const alerts = await (async () => {
-  try {
-    return await apiRequest(`/authorizer/get-alerts/${getCookie("department_id", Astro.cookies)}/${status}/10`, { cookies: Astro.cookies });
-  } catch (error) {
-    return [];
-  }
-})()
+/** CxP y agencia no tienen `authorizer:view_alerts`; evitar 403 en SSR. */
+const rolesWithAuthorizerAlerts: UserRole[] = ["N1", "N2"];
+const alerts =
+  rolesWithAuthorizerAlerts.includes(userRole)
+    ? await (async () => {
+        try {
+          return await apiRequest(
+            `/authorizer/get-alerts/${getCookie("department_id", Astro.cookies)}/${status}/10`,
+            { cookies: Astro.cookies },
+          );
+        } catch {
+          return [];
+        }
+      })()
+    : [];
 ---
 
 <div class="h-full">
