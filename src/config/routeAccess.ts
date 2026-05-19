@@ -51,6 +51,7 @@ export const roleRoutes: Record<UserRole, string[]> = {
     "/comprobar-gastos",
     "/comprobar-gastos/*",
     "/comprobar-solicitud/*",
+    "/detalles-solicitud/*",
   ],
   N1: [
     "/dashboard",
@@ -69,6 +70,7 @@ export const roleRoutes: Record<UserRole, string[]> = {
     "/detalles-solicitud/*",
     "/autorizar-solicitud/*",
     "/subir-comprobante/*",
+    "/reportes/gastos-por-centro",
   ],
   N2: [
     "/dashboard",
@@ -87,6 +89,7 @@ export const roleRoutes: Record<UserRole, string[]> = {
     "/detalles-solicitud/*",
     "/autorizar-solicitud/*",
     "/subir-comprobante/*",
+    "/reportes/gastos-por-centro",
   ],
   Administrador: [...routesAdministracion, "/admin/workflow-rules"],
   "Admin Ditta": routesAdministracion,

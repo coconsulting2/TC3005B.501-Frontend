@@ -31,8 +31,22 @@ const columns: Column[] = [
 export default function CxPAllRequestsList({ data, role }: Props) {
   const requestsPerPage = 15;
   const [page, setPage] = useState(1);
+  const [searchTerm, setSearchTerm] = useState('');
   const [visibleRequests, setVisibleRequests] = useState<Record<string, any>[]>([]);
-  const totalPages = Math.ceil(data.length / requestsPerPage);
+
+  // Filter data before pagination
+  const filteredData = data.filter(r => {
+    if (!searchTerm) return true;
+    const term = searchTerm.toLowerCase();
+    return (
+      r.request_id?.toString().includes(term) ||
+      (r.requester_name && r.requester_name.toLowerCase().includes(term)) ||
+      (r.destination_country && r.destination_country.toLowerCase().includes(term)) ||
+      (r.request_status && r.request_status.toLowerCase().includes(term))
+    );
+  });
+
+  const totalPages = Math.ceil(filteredData.length / requestsPerPage);
   
   useEffect(() => {
     const start = (page - 1) * requestsPerPage;
@@ -40,15 +54,27 @@ export default function CxPAllRequestsList({ data, role }: Props) {
     
     // We already have formatted data from backend (request_id, requester_name, etc)
     // Map status specifically for the DataTable badge
-    const paged = data.slice(start, end).map(r => ({
+    const paged = filteredData.slice(start, end).map(r => ({
       ...r,
       status: r.request_status // DataTable uses 'status' key for the StatusBadge column logic
     }));
     setVisibleRequests(paged);
-  }, [page, data]);
+  }, [page, filteredData]);
   
   return (
     <div>
+      <div className="mb-4">
+        <input
+          type="text"
+          placeholder="Buscar por ID, solicitante, destino o estatus..."
+          className="w-full md:w-1/2 px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-coco-primary focus:border-transparent text-sm"
+          value={searchTerm}
+          onChange={(e) => {
+            setSearchTerm(e.target.value);
+            setPage(1); // Reset to first page on search
+          }}
+        />
+      </div>
       <div className="flex flex-col w-full gap-4 min-h-160">
         <DataTable 
           columns={columns} 

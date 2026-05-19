@@ -1,9 +1,11 @@
-import React from "react";
 import AproveReceipStatus from "@components/AproveReceiptsModal";
 import RejectReceipStatus from "@components/RejectReceiptsModal";
 
 interface ReceiptProps {
   receipt_id: number;
+  request_id: number;
+  receipt_type_name?: string;
+  disabled?: boolean;
   expense_status?: string;
   onApprove?: (id: number) => void;
   onReject?: (id: number) => void;
@@ -12,16 +14,27 @@ interface ReceiptProps {
 
 export default function ReceiptActions({
   receipt_id,
+  request_id,
+  receipt_type_name,
+  disabled = false,
+  token,
   onApprove,
   onReject,
-  token,
 }: ReceiptProps) {
   const handleApproveSuccess = () => {
-    onApprove?.(receipt_id);
+    if (onApprove) {
+      onApprove(receipt_id);
+    } else {
+      window.location.reload();
+    }
   };
 
   const handleRejectSuccess = () => {
-    onReject?.(receipt_id);
+    if (onReject) {
+      onReject(receipt_id);
+    } else {
+      window.location.reload();
+    }
   };
 
   return (
@@ -33,6 +46,7 @@ export default function ReceiptActions({
         redirection=""
         modal_type="success"
         variant="filled"
+        disabled={disabled}
         token={token}
         onSuccess={handleApproveSuccess}
       >
@@ -41,11 +55,9 @@ export default function ReceiptActions({
 
       <RejectReceipStatus
         receipt_id={receipt_id}
-        title="Rechazar comprobante"
-        message="¿Está seguro de que deseas rechazar este comprobante?"
-        redirection=""
-        modal_type="warning"
-        variant="filled"
+        request_id={request_id}
+        receipt_type_name={receipt_type_name}
+        disabled={disabled}
         token={token}
         onSuccess={handleRejectSuccess}
       >

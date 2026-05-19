@@ -20,7 +20,8 @@ const userName = getCookie("username", Astro.cookies);
 const buttonLabel = roleLabels[role];
 const ViewComponent = roleViews[role];
 
-const showMessages: boolean = role !== "Solicitante" && role !== "Administrador";
+/** Panel lateral: solo N1/N2 tienen `authorizer:view_alerts` (GET /authorizer/get-alerts). */
+const showMessages: boolean = role === "N1" || role === "N2";
 ---
 
 <MainLayout title="Dashboard" data={{ userName, buttonLabel, role }} showMessages={showMessages}>
