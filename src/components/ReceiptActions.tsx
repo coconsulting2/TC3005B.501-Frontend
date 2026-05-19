@@ -1,12 +1,9 @@
-import React, { useState } from "react";
-import Modal from "@components/Modal";
+import React from "react";
 import AproveReceipStatus from "@components/AproveReceiptsModal";
 import RejectReceipStatus from "@components/RejectReceiptsModal";
-import { showAppAlert } from "@utils/appAlert";
 
 interface ReceiptProps {
   receipt_id: number;
-  disabled: boolean;
   expense_status?: string;
   onApprove?: (id: number) => void;
   onReject?: (id: number) => void;
@@ -15,51 +12,16 @@ interface ReceiptProps {
 
 export default function ReceiptActions({
   receipt_id,
-  disabled,
   onApprove,
   onReject,
   token,
 }: ReceiptProps) {
-  const [showModal, setShowModal] = useState(false);
-  const [action, setAction] = useState<"approve" | "reject" | null>(null);
-  const [loading, setLoading] = useState(false);
-
-  const handleClick = (type: "approve" | "reject") => {
-    setAction(type);
-    setShowModal(true);
+  const handleApproveSuccess = () => {
+    onApprove?.(receipt_id);
   };
 
-  const confirmAction = async () => {
-    const approval = action === "approve" ? 1 : 0;
-
-    try {
-      setLoading(true);
-      const res = await fetch(
-        `${import.meta.env.PUBLIC_API_BASE_URL}/accounts-payable/validate-receipt/${receipt_id}`,
-        {
-          method: "PUT",
-          headers: { 
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${token}`
-          },
-          body: JSON.stringify({ approval }),
-        }
-      );
-
-      const data = await res.json();
-
-      if (res.ok) {
-        approval === 1 ? onApprove?.(receipt_id) : onReject?.(receipt_id);
-      } else {
-        showAppAlert(data.error || "No se pudo actualizar.", { variant: "error" });
-      }
-    } catch (err) {
-      console.error(err);
-    } finally {
-      setLoading(false);
-      setShowModal(false);
-      setAction(null);
-    }
+  const handleRejectSuccess = () => {
+    onReject?.(receipt_id);
   };
 
   return (
@@ -68,11 +30,11 @@ export default function ReceiptActions({
         receipt_id={receipt_id}
         title="Aprobar comprobante"
         message="¿Está seguro de que deseas aprobar este comprobante?"
-        redirection="/dashboard"
+        redirection=""
         modal_type="success"
         variant="filled"
-        disabled={disabled} 
         token={token}
+        onSuccess={handleApproveSuccess}
       >
         Aprobar
       </AproveReceipStatus>
@@ -81,23 +43,14 @@ export default function ReceiptActions({
         receipt_id={receipt_id}
         title="Rechazar comprobante"
         message="¿Está seguro de que deseas rechazar este comprobante?"
-        redirection="/dashboard"
+        redirection=""
         modal_type="warning"
         variant="filled"
-        disabled={disabled} 
         token={token}
+        onSuccess={handleRejectSuccess}
       >
         Rechazar
       </RejectReceipStatus>
-
-      <Modal
-        title="¿Estás seguro?"
-        message={`¿Seguro que deseas ${action === "approve" ? "aprobar" : "rechazar"} este comprobante?`}
-        type={action === "approve" ? "success" : "warning"}
-        show={showModal}
-        onClose={() => setShowModal(false)}
-        onConfirm={confirmAction}
-      />
     </div>
   );
 }
