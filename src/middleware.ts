@@ -28,7 +28,7 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
   const isAuthenticated = Boolean(role || token);
 
   if (url.pathname === "/") {
-    return Response.redirect("/login");
+    return Response.redirect(new URL("/login", request.url), 302);
   }
 
   // 1. Rutas públicas
