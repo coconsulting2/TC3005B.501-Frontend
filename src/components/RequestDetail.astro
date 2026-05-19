@@ -12,7 +12,16 @@
 import TextHeader from '@components/TextHeader.astro';
 import CommentsThread from '@components/CommentsThread';
 import SolicitudTimeline from '@components/SolicitudTimeline';
-const { request, title, subtitle, currentUserId, authToken } = Astro.props;
+const {
+  request,
+  title,
+  subtitle,
+  currentUserId,
+  authToken,
+  backHref = "/dashboard",
+  showTimeline = true,
+  showComments = true,
+} = Astro.props;
 ---
 
 <main class="flex flex-col items-center">
@@ -24,8 +33,8 @@ const { request, title, subtitle, currentUserId, authToken } = Astro.props;
           subtitle={subtitle}
         />
       </div>
-      <a href="/dashboard" class="inline-block bg-blue-600 text-white font-semibold px-5 py-2 rounded-md shadow hover:bg-blue-700 transition-all duration-200">
-        ← Volver a Dashboard
+      <a href={backHref} class="inline-block bg-blue-600 text-white font-semibold px-5 py-2 rounded-md shadow hover:bg-blue-700 transition-all duration-200">
+        ← Volver
       </a>
     </div>
     <p class="mb-12 text-lg">
@@ -82,20 +91,26 @@ const { request, title, subtitle, currentUserId, authToken } = Astro.props;
       </section>
     )}
 
-    <section class="mt-12 pt-8 border-t-2 border-gray-200">
-      <SolicitudTimeline
-        client:only="react"
-        requestId={request.request_id}
-      />
-    </section>
+    <slot name="before-timeline" />
 
-    <section class="mt-12 pt-8 border-t-2 border-gray-200 max-h-2/12">
-      <CommentsThread
-        client:only="react"
-        requestId={request.request_id}
-        currentUserId={currentUserId || 1}
-        authToken={authToken || ''}
-      />
-    </section>
+    {showTimeline && (
+      <section class="mt-12 pt-8 border-t-2 border-gray-200">
+        <SolicitudTimeline
+          client:only="react"
+          requestId={request.request_id}
+        />
+      </section>
+    )}
+
+    {showComments && (
+      <section class="mt-12 pt-8 border-t-2 border-gray-200 max-h-2/12">
+        <CommentsThread
+          client:only="react"
+          requestId={request.request_id}
+          currentUserId={currentUserId || 1}
+          authToken={authToken || ''}
+        />
+      </section>
+    )}
   </div>
 </main>

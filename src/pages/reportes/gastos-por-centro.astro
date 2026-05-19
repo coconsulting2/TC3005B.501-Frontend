@@ -27,7 +27,7 @@ const token = getCookie("token", Astro.cookies);
     <EditorialHeader
       eyebrow="Coco / Reportes / Gasto por CC"
       title="Gasto por centro de costos"
-      subtitle="Visualiza el gasto acumulado por periodo, identifica los CCs cerca de su presupuesto y filtra por tipo y estatus."
+      subtitle="Resumen de gastos de viaje de tu equipo (subordinados en la jerarquía). Los autorizadores N1 y N2 solo ven personas que reportan a ellos, no a sus superiores ni pares."
     />
     <ExpensesDashboard client:only="react" token={token} />
   </div>

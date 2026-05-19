@@ -69,8 +69,14 @@ export interface CostCenterBudget {
   spent: number;
 }
 
+/** `team` = solo subordinados del usuario (N1/N2); `organization` = toda la org (CxP/admin). */
+export type ExpenseReportScope = "organization" | "team";
+
 export interface ExpenseReportResponse {
   generated_at: string;
+  scope?: ExpenseReportScope;
+  /** Personas en el árbol de reportes del manager; null si alcance organizacional. */
+  team_member_count?: number | null;
   rows: ExpenseReportRow[];
   budgets: CostCenterBudget[];
 }
