@@ -31,13 +31,13 @@ const requests = await (async () => {
   <div>
     {requests && requests.length === 0 ? (
       <div class="mt-8 text-center">
-        <p class="text-sm text-[var(--color-ink-muted)]">No hay solicitudes en la organización.</p>
+        <p class="text-sm text-[var(--color-ink-muted)]">No hay solicitudes en validación de comprobantes ni finalizadas.</p>
       </div>
     ) : (
       <EditorialHeader
         eyebrow="Coco / Finanzas / Historial General"
         title="Todas las Solicitudes"
-        subtitle="Visualiza el historial completo de solicitudes de la organización"
+        subtitle="Solicitudes en validación de comprobantes o ya finalizadas. No se muestran etapas previas del flujo (aprobaciones, cotización, etc.)."
       />
       <CxPAllRequestsList
         client:only="react"

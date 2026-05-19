@@ -10,7 +10,6 @@
 import { getCookie } from "@data/cookies";
 import RequestDetail from "@components/RequestDetail.astro";
 import RequestComprobantesSection from "@components/RequestComprobantesSection.astro";
-import RequestHistorySection from "@components/RequestHistorySection.astro";
 import TravelRequestActionWrapper from "@components/TravelRequestActionWrapper.tsx";
 
 interface Props {
@@ -33,11 +32,6 @@ const id = request.request_id;
 const canAct = canAuthorize;
 
 const receipts = Array.isArray(request?.receipts) ? request.receipts : [];
-const history = Array.isArray(request?.status_history)
-  ? request.status_history
-  : Array.isArray(request?.history)
-    ? request.history
-    : [];
 ---
 
 <main class="flex flex-col">
@@ -51,7 +45,6 @@ const history = Array.isArray(request?.status_history)
     />
 
     <RequestComprobantesSection receipts={receipts} />
-    <RequestHistorySection events={history} />
 
     {
       canAct ? (

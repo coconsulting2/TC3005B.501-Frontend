@@ -9,11 +9,15 @@ import ReceiptDetailCard, { type ReceiptDetailProps } from "@components/ReceiptD
 import ReceiptActions from "@components/ReceiptActions";
 
 interface ReceiptItemProps extends Omit<ReceiptDetailProps, "children"> {
+  requestId: number;
+  receiptTypeName: string;
   token: string;
 }
 
 export default function ReceiptItem({
   receiptId,
+  requestId,
+  receiptTypeName,
   token,
   ...cardProps
 }: ReceiptItemProps) {
@@ -40,6 +44,8 @@ export default function ReceiptItem({
         <div className="mt-3 ml-10 flex items-center gap-3">
           <ReceiptActions
             receipt_id={receiptId}
+            request_id={requestId}
+            receipt_type_name={receiptTypeName}
             token={token}
             onApprove={handleApproveSuccess}
             onReject={handleRejectSuccess}
