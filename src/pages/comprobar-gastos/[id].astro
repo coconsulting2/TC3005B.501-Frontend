@@ -2,12 +2,12 @@
 /**
  * Author: José Antonio González and Kenia Esmeralda Ramos Javier
  * Updated: Editorial Finance design system
+ * Updated: Avoid hot reloads on actions (approve / denied)
  */
 export const prerender = false;
 import MainLayout from "@layouts/MainLayout.astro";
 import EditorialHeader from "@components/EditorialHeader.astro";
-import ReceiptActions from "@components/ReceiptActions";
-import ReceiptDetailCard from "@components/ReceiptDetailCard";
+import ReceiptItem from "@components/ReceiptItem";
 import type { UserRole } from "@type/roles";
 import FinishRequestButton from "@components/FinisCheck.tsx";
 
@@ -70,11 +70,9 @@ const allReviewed = enrichedExpenses.every((receipt: any) => receipt.validation 
         </div>
       ) : (
         <div>
-          {enrichedExpenses.map((receipt: any, index: number) => {
-            const isLast = index === enrichedExpenses.length - 1;
-            return (
-              <ReceiptDetailCard
-                client:visible
+          {enrichedExpenses.map((receipt: any, index: number) => (
+              <ReceiptItem
+                client:only="react"
                 index={index}
                 receiptId={receipt.receipt_id}
                 receiptTypeName={receipt.receipt_type_name}
@@ -85,20 +83,11 @@ const allReviewed = enrichedExpenses.every((receipt: any) => receipt.validation 
                 xml={receipt.fileMap?.xml ?? null}
                 receiptImage={receipt.fileMap?.receipt_image ?? null}
                 apiBaseUrl={import.meta.env.PUBLIC_API_BASE_URL}
-                isLast={isLast}
-              >
-                <div class="mt-3 ml-10 flex items-center gap-3">
-                  <ReceiptActions
-                    client:only="react"
-                    receipt_id={receipt.receipt_id}
-                    expense_status={receipt.expense_status}
-                    disabled={receipt.validation !== "Pendiente"}
-                    token={getCookie("token", Astro.cookies)}
-                  />
-                </div>
-              </ReceiptDetailCard>
-            );
-          })}
+                isLast={index === enrichedExpenses.length - 1}
+                token={getCookie("token", Astro.cookies)}
+              />
+
+          ))}
         </div>
       )}
     </section>
