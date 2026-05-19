@@ -63,7 +63,7 @@ export default function CommentsThread({
                                            apiBaseUrl = resolveApiBaseUrl(),
                                        }: CommentsThreadProps): React.ReactElement {
 
-    const limit: number = commentsLoadLimit ?? 10;
+    const limit: number = commentsLoadLimit ?? 200;
     const streamUrl = `${apiBaseUrl}/solicitudes/${requestId}/comments/stream?user_id=${currentUserId}&limit=${limit}`;
     const loadUrl = `/solicitudes/${requestId}/comments?user_id=${currentUserId}&limit=${limit}`;
 
