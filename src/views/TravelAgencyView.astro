@@ -13,9 +13,17 @@ import { getCookie } from "@data/cookies";
 import { apiRequest } from '@utils/apiClient';
 
 const { userName } = Astro.props;
+const deptId = getCookie("department_id", Astro.cookies);
 const requests = await (async () => {
   try {
-    return await apiRequest(`/user/get-travel-requests/${getCookie("department_id", Astro.cookies)}/5`, { cookies: Astro.cookies });
+    return await apiRequest(`/user/get-travel-requests/${deptId}/5`, { cookies: Astro.cookies });
+  } catch (error) {
+    return [];
+  }
+})();
+const cancelled = await (async () => {
+  try {
+    return await apiRequest(`/user/get-travel-requests/${deptId}/9`, { cookies: Astro.cookies });
   } catch (error) {
     return [];
   }
@@ -52,6 +60,15 @@ const requests = await (async () => {
       urlBase="atender-solicitud"
       subtitle="Pendiente de atención por la agencia"
       emptyMessage="No hay solicitudes por atender"
+    />
+
+    <RequestSection
+      title="Viajes cancelados"
+      requests={cancelled}
+      anchor="atenciones"
+      urlBase="atender-solicitud"
+      subtitle="Cancelado — revisa si ya habías reservado"
+      emptyMessage="No hay viajes cancelados recientes"
     />
   </main>
 </div>

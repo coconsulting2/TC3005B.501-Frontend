@@ -2,19 +2,18 @@
 import { apiRequest } from "@/utils/apiClient";
 import { getCookie } from "@data/cookies";
 
-// Diccionario de status según el rol que accede
-const statusByRole = {
-  'Solicitante': 1,
-  'Agencia de viajes': 2,
-  'Cuentas por pagar': 3,
-  'N1': 4,
-  'N2': 5,
-  'Administrador': 6,
+/**
+ * request_status_id del catálogo global (seed.js), no índices de rol.
+ * N1 → Primera revisión (2), N2 → Segunda revisión (3).
+ */
+const requestStatusForAuthorizerAlerts: Record<string, number> = {
+  N1: 2,
+  N2: 3,
 };
 
-type UserRole = keyof typeof statusByRole;
+type UserRole = keyof typeof requestStatusForAuthorizerAlerts;
 const userRole = getCookie("role", Astro.cookies) as UserRole;
-const status = statusByRole[userRole];
+const status = requestStatusForAuthorizerAlerts[userRole];
 /** CxP y agencia no tienen `authorizer:view_alerts`; evitar 403 en SSR. */
 const rolesWithAuthorizerAlerts: UserRole[] = ["N1", "N2"];
 const alerts =
