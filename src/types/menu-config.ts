@@ -37,6 +37,7 @@ export const SIDEBAR_CONFIG: Record<string, MenuItem[]> = {
   ],
   'Cuentas por pagar': [
     { label: 'DASHBOARD', route: '/dashboard', icon: 'home' },
+    { label: 'TODAS LAS SOLICITUDES', route: '/todas-las-solicitudes', icon: 'list_alt' },
     { label: 'COTIZACIONES', route: '/cotizaciones', icon: 'paid' },
     { label: 'COMPROBACIONES', route: '/comprobaciones', icon: 'receipt' },
     { label: 'EXPORTAR ERP', route: '/exportar-contable', icon: 'cloud_upload' },
