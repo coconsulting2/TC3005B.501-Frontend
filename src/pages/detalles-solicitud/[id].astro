@@ -10,6 +10,7 @@ export const prerender = false;
 
 import MainLayout from "@layouts/MainLayout.astro";
 import RequestDetail from "@components/RequestDetail.astro";
+import RequestExpensesValidationSection from "@components/RequestExpensesValidationSection.astro";
 import type { UserRole } from "@type/roles";
 
 import { getCookie } from "@data/cookies";
@@ -33,6 +34,11 @@ try {
   return Astro.redirect('/404');
 }
 
+const isCxP = role === "Cuentas por pagar";
+const statusId = Number(request.request_status_id);
+const showExpenseValidation = isCxP && (statusId === 7 || statusId === 8);
+const canValidateReceipts = isCxP && statusId === 7;
+const backHref = isCxP ? "/todas-las-solicitudes" : "/dashboard";
 ---
 
 <MainLayout title={`Detalle #${request.request_id}`} data={{ userName, buttonLabel, role }} >
@@ -40,5 +46,17 @@ try {
     request={request}
     currentUserId={userId ? parseInt(userId as string) : undefined}
     authToken={token as string}
-  />
+    backHref={backHref}
+  >
+    {showExpenseValidation && (
+      <RequestExpensesValidationSection
+        slot="before-timeline"
+        requestId={request.request_id}
+        enableActions={canValidateReceipts}
+        showDedicatedLink={canValidateReceipts}
+        showFinishButton={canValidateReceipts}
+        finishRedirectTo="/todas-las-solicitudes"
+      />
+    )}
+  </RequestDetail>
 </MainLayout>
