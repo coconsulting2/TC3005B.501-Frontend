@@ -1,14 +1,14 @@
 ---
 /**
  * Author: José Antonio González and Kenia Esmeralda Ramos Javier
- * Updated: Editorial Finance design system; resumen de solicitud + sección compartida de comprobantes.
+ * Updated: Editorial Finance; resumen de solicitud, liquidación y comprobantes sin recarga total (ReceiptItem opcional en main).
  */
 export const prerender = false;
 import MainLayout from "@layouts/MainLayout.astro";
 import EditorialHeader from "@components/EditorialHeader.astro";
 import RequestDetail from "@components/RequestDetail.astro";
 import RequestExpensesValidationSection from "@components/RequestExpensesValidationSection.astro";
-import CommentsThread from "@components/CommentsThread";
+import CommentsThread from "@components/comments/CommentsThread";
 import type { UserRole } from "@type/roles";
 
 import { getCookie } from "@data/cookies";
@@ -16,7 +16,7 @@ import { roleLabels } from "@config/role-labels";
 import { apiRequest } from "@/utils/apiClient";
 
 const role: UserRole = getCookie("role", Astro.cookies) as UserRole;
-const userName = getCookie("username", Astro.cookies);
+const userName = getCookie("username", Astro.cookies) ?? "";
 const buttonLabel = roleLabels[role];
 
 const { id } = Astro.params;
@@ -80,6 +80,7 @@ const authToken = getCookie("token", Astro.cookies);
       </header>
       <CommentsThread
         client:only="react"
+        name={userName}
         requestId={numericId}
         currentUserId={currentUserId ? parseInt(String(currentUserId), 10) : 1}
         authToken={authToken ?? ""}

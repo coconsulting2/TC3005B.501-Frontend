@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import React, { useCallback, useState } from "react";
 import { apiRequest } from "@utils/apiClient";
 import Modal from "@components/Modal";
 import Toast from "@components/Toast";
@@ -24,6 +24,7 @@ interface Props {
   token: string;
   disabled?: boolean;
   children: React.ReactNode;
+  onSuccess?: () => void;
 }
 
 export default function RejectReceipStatus({
@@ -33,6 +34,7 @@ export default function RejectReceipStatus({
   token,
   disabled = false,
   children,
+  onSuccess,
 }: Props) {
   const [open, setOpen] = useState(false);
   const [comment, setComment] = useState("");
@@ -58,15 +60,19 @@ export default function RejectReceipStatus({
       setOpen(false);
       setComment("");
       setToast({ message: "Comprobante rechazado.", type: "success" });
-      await new Promise((r) => setTimeout(r, 1200));
-      window.location.reload();
+      if (onSuccess) {
+        onSuccess();
+      } else {
+        await new Promise((r) => setTimeout(r, 1200));
+        window.location.reload();
+      }
     } catch (error) {
       console.error("Error en la solicitud:", error);
       setToast({ message: mensajeErrorApi(error), type: "error" });
     } finally {
       setSubmitting(false);
     }
-  }, [receipt_id, token, comment]);
+  }, [receipt_id, token, comment, onSuccess]);
 
   const btnClass = getButtonClasses({
     variant: "filled",

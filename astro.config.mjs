@@ -14,7 +14,7 @@ export default defineConfig({
     mode: 'standalone'
   }),
   server: {
-    open: '/login',
+    open: '/login'
   },
   integrations: [react()],
   vite: {
@@ -27,7 +27,18 @@ export default defineConfig({
       // polyfill crashes with "null is not an object (evaluating 'prop')" when
       // accessing incomingRequest.socket. An empty proxy object trips the
       // `if (proxy)` branch in vite's server factory without proxying anything.
-      proxy: {},
+      proxy: {
+        'https://localhost:3000': {
+          target: 'https://localhost:3000',
+          changeOrigin: true,
+          secure: false
+        }
+      },
+      watch: {
+        usePolling: true,
+        interval: 100,
+        depth: 100,
+      }
     },
   },
   env: {
