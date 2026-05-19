@@ -304,6 +304,25 @@ export default function ExpensesDashboard({
         </div>
       )}
 
+      {response.scope === "team" && !usingSeed && (
+        <div
+          className="card-editorial border border-primary-200 bg-primary-50 p-4 text-sm text-[var(--color-ink-secondary)]"
+          role="note"
+        >
+          <p className="font-medium text-[var(--color-ink)]">
+            Gasto de tu equipo
+          </p>
+          <p className="mt-1">
+            Solo se incluyen comprobantes de personas que reportan a ti en la
+            jerarquía (
+            {typeof response.team_member_count === "number"
+              ? `${response.team_member_count} colaborador${response.team_member_count === 1 ? "" : "es"}`
+              : "subordinados"}
+            ). No verás gastos de tus superiores ni de otros equipos.
+          </p>
+        </div>
+      )}
+
       {/* Filters */}
       <section
         className="card-editorial p-4 sm:p-5"
@@ -439,7 +458,7 @@ export default function ExpensesDashboard({
       {/* KPI cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-0">
         <KpiCell
-          label="Gasto acumulado"
+          label={response.scope === "team" ? "Gasto del equipo" : "Gasto acumulado"}
           value={formatMxn(grandTotal)}
           detail={`${filteredRows.length} comprobantes`}
           position="first"

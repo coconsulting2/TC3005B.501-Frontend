@@ -1,15 +1,15 @@
 ---
 /**
  * Author: José Antonio González and Kenia Esmeralda Ramos Javier
- * Updated: Editorial Finance design system
+ * Updated: Editorial Finance design system; resumen de solicitud + sección compartida de comprobantes.
  */
 export const prerender = false;
 import MainLayout from "@layouts/MainLayout.astro";
 import EditorialHeader from "@components/EditorialHeader.astro";
-import ReceiptActions from "@components/ReceiptActions";
-import ReceiptDetailCard from "@components/ReceiptDetailCard";
+import RequestDetail from "@components/RequestDetail.astro";
+import RequestExpensesValidationSection from "@components/RequestExpensesValidationSection.astro";
+import CommentsThread from "@components/CommentsThread";
 import type { UserRole } from "@type/roles";
-import FinishRequestButton from "@components/FinisCheck.tsx";
 
 import { getCookie } from "@data/cookies";
 import { roleLabels } from "@config/role-labels";
@@ -20,87 +20,70 @@ const userName = getCookie("username", Astro.cookies);
 const buttonLabel = roleLabels[role];
 
 const { id } = Astro.params;
-let request = null;
-try {
-  request = await apiRequest(`/accounts-payable/get-expense-validations/${id}`, { cookies: Astro.cookies });
-} catch (error) {
-  request = null;
-  throw new Error(`No request found with ID ${id}`);
-  return Astro.redirect('/404');
-}
-
 const numericId = Number(id);
 if (isNaN(numericId)) {
   throw new Error(`El ID debe ser numérico. Recibido: ${id}`);
 }
 
-const enrichedExpenses = await Promise.all(
-  request.Expenses.map(async (receipt: any) => {
-    const fileMap = await apiRequest(`/files/receipt-files/${receipt.receipt_id}`, { cookies: Astro.cookies });
-    return { ...receipt, fileMap };
-  })
-);
-const allReviewed = enrichedExpenses.every((receipt: any) => receipt.validation !== "Pendiente");
+let travelRequest = null;
+try {
+  travelRequest = await apiRequest(`/applicant/get-user-request/${id}`, { cookies: Astro.cookies });
+} catch {
+  travelRequest = null;
+}
+
+const currentUserId = getCookie("id", Astro.cookies);
+const authToken = getCookie("token", Astro.cookies);
 ---
 
-<MainLayout title={`Solicitud #${request.request_id}`} data={{ userName, buttonLabel, role }}>
-  <main>
+<MainLayout title={`Solicitud #${numericId}`} data={{ userName, buttonLabel, role }}>
+  <main class="flex flex-col gap-8">
     <EditorialHeader
-      eyebrow={`Coco / Comprobaciones / #${request.request_id}`}
-      title={`Solicitud #${request.request_id}`}
-      subtitle="Comprobantes de gastos"
+      eyebrow={`Coco / Comprobaciones / #${numericId}`}
+      title={`Solicitud #${numericId}`}
+      subtitle="Validación de comprobantes de gastos"
     >
-      {allReviewed && (
-        <FinishRequestButton
-          client:only="react"
-          requestId={request.request_id}
-          token={getCookie("token", Astro.cookies)}
-        />
-      )}
+      <a
+        href={`/detalles-solicitud/${numericId}`}
+        class="text-sm font-medium text-[var(--color-primary-600)] hover:underline whitespace-nowrap"
+      >
+        Ver detalle completo de la solicitud →
+      </a>
     </EditorialHeader>
 
-    <section class="card-editorial overflow-hidden">
-      <div class="px-6 py-3 border-b border-[var(--color-neutral-200)]">
-        <h3 class="eyebrow">Comprobantes</h3>
-      </div>
+    {travelRequest && (
+      <RequestDetail
+        request={travelRequest}
+        title={`SOLICITUD #${travelRequest.request_id}`}
+        subtitle="Resumen del viaje"
+        backHref="/comprobaciones"
+        showTimeline={false}
+        showComments={false}
+      />
+    )}
 
-      {enrichedExpenses.length === 0 ? (
-        <div class="p-8 text-center">
-          <p class="text-sm text-[var(--color-ink-muted)]">No hay comprobantes de gastos pendientes de comprobar</p>
-        </div>
-      ) : (
-        <div>
-          {enrichedExpenses.map((receipt: any, index: number) => {
-            const isLast = index === enrichedExpenses.length - 1;
-            return (
-              <ReceiptDetailCard
-                client:visible
-                index={index}
-                receiptId={receipt.receipt_id}
-                receiptTypeName={receipt.receipt_type_name}
-                amount={receipt.amount}
-                validation={receipt.validation}
-                cfdi={receipt.cfdi ?? null}
-                pdf={receipt.fileMap?.pdf ?? null}
-                xml={receipt.fileMap?.xml ?? null}
-                receiptImage={receipt.fileMap?.receipt_image ?? null}
-                apiBaseUrl={import.meta.env.PUBLIC_API_BASE_URL}
-                isLast={isLast}
-              >
-                <div class="mt-3 ml-10 flex items-center gap-3">
-                  <ReceiptActions
-                    client:only="react"
-                    receipt_id={receipt.receipt_id}
-                    expense_status={receipt.expense_status}
-                    disabled={receipt.validation !== "Pendiente"}
-                    token={getCookie("token", Astro.cookies)}
-                  />
-                </div>
-              </ReceiptDetailCard>
-            );
-          })}
-        </div>
-      )}
+    <RequestExpensesValidationSection
+      requestId={numericId}
+      enableActions={true}
+      showFinishButton={true}
+    />
+
+    <section class="card-editorial p-5 sm:p-6">
+      <header class="mb-4">
+        <p class="eyebrow">Comunicación</p>
+        <h2 class="font-editorial text-xl font-normal text-[var(--color-ink)] mt-1">
+          Comentarios de la solicitud
+        </h2>
+        <p class="text-sm text-[var(--color-ink-muted)] mt-1">
+          Usa el chat para pedir aclaraciones al solicitante. Al rechazar un comprobante, el motivo se publica aquí automáticamente.
+        </p>
+      </header>
+      <CommentsThread
+        client:only="react"
+        requestId={numericId}
+        currentUserId={currentUserId ? parseInt(String(currentUserId), 10) : 1}
+        authToken={authToken ?? ""}
+      />
     </section>
   </main>
 </MainLayout>

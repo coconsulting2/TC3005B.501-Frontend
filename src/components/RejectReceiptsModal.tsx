@@ -1,7 +1,8 @@
 import { useCallback, useState } from "react";
 import { apiRequest } from "@utils/apiClient";
-import ModalWrapper from "@components/ModalWrapper";
+import Modal from "@components/Modal";
 import Toast from "@components/Toast";
+import { getButtonClasses } from "@type/button";
 
 function mensajeErrorApi(error: unknown): string {
   if (!error || typeof error !== "object" || !("detail" in error)) {
@@ -18,60 +19,119 @@ function mensajeErrorApi(error: unknown): string {
 
 interface Props {
   receipt_id: number;
-  title: string;
-  message: string;
-  redirection: string;
-  modal_type: "success" | "warning";
-  variant?: "filled" | "border" | "empty";
-  children: React.ReactNode;
-  disabled?: boolean;
+  request_id: number;
+  receipt_type_name?: string;
   token: string;
+  disabled?: boolean;
+  children: React.ReactNode;
 }
 
 export default function RejectReceipStatus({
   receipt_id,
-  title,
-  message,
-  redirection,
-  modal_type,
-  variant,
-  children,
-  disabled = false,
+  request_id,
+  receipt_type_name,
   token,
+  disabled = false,
+  children,
 }: Props) {
+  const [open, setOpen] = useState(false);
+  const [comment, setComment] = useState("");
+  const [submitting, setSubmitting] = useState(false);
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
   const handleConfirm = useCallback(async () => {
-    try {
-        const url = `/accounts-payable/validate-receipt/${receipt_id}`;
-      await apiRequest(url, { 
-        method: "PUT", 
-        data: {"approval": 0},
-        headers: { Authorization: `Bearer ${token}` }
+    const c = comment.trim();
+    if (!c) {
+      setToast({
+        message: "El comentario es obligatorio para rechazar.",
+        type: "error",
       });
-      setToast({ message: "Rechazado correctamente", type: "success" });
-      await new Promise((r) => setTimeout(r, 1600));
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await apiRequest(`/accounts-payable/validate-receipt/${receipt_id}`, {
+        method: "PUT",
+        data: { approval: 0, comentario: c },
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setOpen(false);
+      setComment("");
+      setToast({ message: "Comprobante rechazado.", type: "success" });
+      await new Promise((r) => setTimeout(r, 1200));
       window.location.reload();
     } catch (error) {
       console.error("Error en la solicitud:", error);
       setToast({ message: mensajeErrorApi(error), type: "error" });
+    } finally {
+      setSubmitting(false);
     }
-  }, [receipt_id, token]);
+  }, [receipt_id, token, comment]);
+
+  const btnClass = getButtonClasses({
+    variant: "filled",
+    color: "danger",
+    size: "medium",
+  });
 
   return (
     <>
-      <ModalWrapper
-        title={title}
-        message={message}
-        button_type={modal_type === "warning" ? "danger" : modal_type}
-        modal_type={modal_type}
-        onConfirm={handleConfirm}
-        variant={variant}
+      <button
+        type="button"
+        onClick={() => {
+          if (!disabled) setOpen(true);
+        }}
+        className={`${btnClass} pointer-events-auto transition-transform duration-200 hover:scale-105 min-h-11 min-w-11`}
+        style={disabled ? { opacity: 0.5, pointerEvents: "none" } : undefined}
         disabled={disabled}
       >
         {children}
-      </ModalWrapper>
-      {toast && <Toast message={toast.message} type={toast.type} duration={toast.type === "error" ? 5000 : 3500} />}
+      </button>
+
+      <Modal
+        title="Rechazar comprobante"
+        message="Indique el motivo del rechazo. El comentario quedará visible en el chat de la solicitud para el solicitante."
+        type="warning"
+        show={open}
+        onClose={() => {
+          if (!submitting) {
+            setOpen(false);
+            setComment("");
+          }
+        }}
+        onConfirm={submitting ? undefined : handleConfirm}
+        confirmLabel={submitting ? "Guardando…" : "Rechazar"}
+      >
+        <label
+          className="block text-sm text-[var(--color-ink-secondary)] mb-1"
+          htmlFor={`reject-receipt-${receipt_id}`}
+        >
+          Comentario (obligatorio)
+        </label>
+        <textarea
+          id={`reject-receipt-${receipt_id}`}
+          className="w-full min-h-[100px] border border-[var(--color-neutral-300)] rounded-[var(--radius-md)] p-2 text-sm text-[var(--color-ink)]"
+          value={comment}
+          onChange={(e) => setComment(e.target.value)}
+          placeholder={
+            receipt_type_name
+              ? `Motivo del rechazo de ${receipt_type_name}…`
+              : "Motivo del rechazo…"
+          }
+          disabled={submitting}
+        />
+        <p className="text-xs text-[var(--color-ink-muted)] mt-2">
+          Solicitud #{request_id} · también puedes escribir en el chat más abajo.
+        </p>
+      </Modal>
+
+      {toast && (
+        <Toast
+          message={toast.message}
+          type={toast.type}
+          duration={toast.type === "error" ? 5000 : 3500}
+        />
+      )}
     </>
   );
 }
