@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import React, { useCallback, useState } from "react";
 import { apiRequest } from "@utils/apiClient";
 import ModalWrapper from "@components/ModalWrapper";
 import Toast from "@components/Toast";
@@ -20,24 +20,25 @@ interface Props {
   receipt_id: number;
   title: string;
   message: string;
-  redirection: string;
+  redirection?: string; // NOTE: Don't feel like tracing usages to delete safely
   modal_type: "success" | "warning";
   variant?: "filled" | "border" | "empty";
   children: React.ReactNode;
   disabled?: boolean;
   token: string;
+  onSuccess?: () => void;
 }
 
 export default function RejectReceipStatus({
   receipt_id,
   title,
   message,
-  redirection,
   modal_type,
   variant,
   children,
   disabled = false,
   token,
+  onSuccess,
 }: Props) {
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null);
 
@@ -50,13 +51,12 @@ export default function RejectReceipStatus({
         headers: { Authorization: `Bearer ${token}` }
       });
       setToast({ message: "Rechazado correctamente", type: "success" });
-      await new Promise((r) => setTimeout(r, 1600));
-      window.location.reload();
+      onSuccess?.();
     } catch (error) {
       console.error("Error en la solicitud:", error);
       setToast({ message: mensajeErrorApi(error), type: "error" });
     }
-  }, [receipt_id, token]);
+  }, [receipt_id, token, onSuccess]);
 
   return (
     <>

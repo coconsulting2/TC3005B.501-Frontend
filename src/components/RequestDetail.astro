@@ -10,9 +10,12 @@
  **/
 
 import TextHeader from '@components/TextHeader.astro';
-import CommentsThread from '@components/CommentsThread';
+import CommentsThread from '@components/comments/CommentsThread';
+import { getCookie } from "@data/cookies.ts";
 import SolicitudTimeline from '@components/SolicitudTimeline';
 const { request, title, subtitle, currentUserId, authToken } = Astro.props;
+
+const username = getCookie("username", Astro.cookies);
 ---
 
 <main class="flex flex-col items-center">
@@ -92,6 +95,7 @@ const { request, title, subtitle, currentUserId, authToken } = Astro.props;
     <section class="mt-12 pt-8 border-t-2 border-gray-200 max-h-2/12">
       <CommentsThread
         client:only="react"
+        name={username}
         requestId={request.request_id}
         currentUserId={currentUserId || 1}
         authToken={authToken || ''}

@@ -234,10 +234,10 @@ export default function UploadSuccessCard({
       {/* ── Navigation buttons ── */}
       <div className="flex flex-wrap gap-3">
         <a
-          href="/dashboard"
-          className="inline-flex items-center justify-center rounded-[var(--radius-md)] bg-primary-500 px-5 py-2.5 text-sm font-medium text-white hover:bg-primary-600 transition-colors shadow-sm"
+            href={`/subir-comprobante/${requestId}`}
+            className="inline-flex items-center justify-center rounded-[var(--radius-md)] bg-primary-500 px-5 py-2.5 text-sm font-medium text-white hover:bg-primary-600 transition-colors shadow-sm"
         >
-          Ir al dashboard
+          + Agregar otro comprobante
         </a>
         <a
           href={`/comprobar-solicitud/${requestId}`}
