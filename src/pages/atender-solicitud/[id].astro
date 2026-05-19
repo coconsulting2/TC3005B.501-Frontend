@@ -41,6 +41,7 @@ const { needsPlane, needsHotel } = computeAgencyServiceFlags(request.routes);
 const hotelSearchDefaults = buildHotelSearchDefaults(request.routes);
 const flightSearchDefaults = buildFlightSearchDefaults(request.routes);
 const needsAgencyQuotation = needsPlane || needsHotel;
+const isCancelled = Number(request.request_status_id) === 9;
 
 ---
 
@@ -48,11 +49,44 @@ const needsAgencyQuotation = needsPlane || needsHotel;
   <RequestDetail
     request={request}
     title={`SOLICITUD #${request.request_id}`}
-    subtitle="Detalles de la Solicitud a Atender"
+    subtitle={isCancelled ? "Viaje cancelado por el solicitante" : "Detalles de la Solicitud a Atender"}
     currentUserId={userId ? parseInt(String(userId), 10) : undefined}
     authToken={token}
   />
-  {needsAgencyQuotation ? (
+
+  {isCancelled && (
+    <section class="card-editorial border-danger-200 bg-danger-50 p-5 sm:p-6 mt-8" role="alert">
+      <p class="eyebrow text-danger-600">Cancelación</p>
+      <h2 class="font-editorial text-xl font-normal text-[var(--color-ink)] mt-1">
+        Este viaje fue cancelado
+      </h2>
+      <p class="text-sm text-[var(--color-ink-secondary)] mt-2">
+        El solicitante canceló después de que la agencia registró la reserva. No puedes modificar la cotización.
+      </p>
+      {(request.selected_flight_offer || request.selected_hotel_offer) && (
+        <ul class="mt-4 space-y-2 text-sm text-[var(--color-ink)]">
+          {request.selected_flight_offer && (
+            <li>
+              <span class="font-medium">Vuelo:</span>{" "}
+              {typeof request.selected_flight_offer === "object" && request.selected_flight_offer !== null
+                ? (request.selected_flight_offer as { label?: string }).label ?? "Reserva registrada"
+                : "Reserva registrada"}
+            </li>
+          )}
+          {request.selected_hotel_offer && (
+            <li>
+              <span class="font-medium">Hotel:</span>{" "}
+              {typeof request.selected_hotel_offer === "object" && request.selected_hotel_offer !== null
+                ? (request.selected_hotel_offer as { label?: string }).label ?? "Reserva registrada"
+                : "Reserva registrada"}
+            </li>
+          )}
+        </ul>
+      )}
+    </section>
+  )}
+
+  {!isCancelled && needsAgencyQuotation ? (
     <div class="mt-8">
       <AttendRequest
         client:only="react"
@@ -64,7 +98,7 @@ const needsAgencyQuotation = needsPlane || needsHotel;
         flightSearchDefaults={flightSearchDefaults}
       />
     </div>
-  ) : (
+  ) : !isCancelled ? (
     <div class="flex justify-end gap-4 mt-8">
       <AproveRequest
         client:only="react"
@@ -79,5 +113,5 @@ const needsAgencyQuotation = needsPlane || needsHotel;
         Finalizar atención
       </AproveRequest>
     </div>
-  )}
+  ) : null}
 </MainLayout>
