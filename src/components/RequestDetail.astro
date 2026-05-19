@@ -11,6 +11,7 @@
 
 import TextHeader from '@components/TextHeader.astro';
 import CommentsThread from '@components/CommentsThread';
+import SolicitudTimeline from '@components/SolicitudTimeline';
 const { request, title, subtitle, currentUserId, authToken } = Astro.props;
 ---
 
@@ -80,6 +81,13 @@ const { request, title, subtitle, currentUserId, authToken } = Astro.props;
         <p class="text-lg">{request.notes}</p>
       </section>
     )}
+
+    <section class="mt-12 pt-8 border-t-2 border-gray-200">
+      <SolicitudTimeline
+        client:only="react"
+        requestId={request.request_id}
+      />
+    </section>
 
     <section class="mt-12 pt-8 border-t-2 border-gray-200 max-h-2/12">
       <CommentsThread
