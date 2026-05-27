@@ -263,9 +263,14 @@ export default function OnboardingImportAdmin({ orgId }: Props) {
           typeof spec.templateRoleName === "string" &&
           spec.templateRoleName.trim()
         ) {
+          const customName =
+            typeof spec.customRoleName === "string"
+              ? spec.customRoleName.trim()
+              : "";
           customPayload[un] = {
             templateRoleName: spec.templateRoleName.trim(),
             permissions: [...spec.permissions],
+            ...(customName ? { customRoleName: customName } : {}),
           };
         }
       }
@@ -587,9 +592,12 @@ function PreviewPanel({
       const custom = customImportRolesByUser[u.userName];
       if (custom?.permissions?.length) {
         const perms = [...custom.permissions];
+        const customName = custom.customRoleName?.trim();
         return {
           ...u,
-          roleName: `Otro (base: ${custom.templateRoleName})`,
+          roleName: customName
+            ? customName
+            : `Otro (base: ${custom.templateRoleName})`,
           rolePermissionCodes: perms,
           effectivePermissions: perms,
           needsRoleMapping: false,
@@ -1383,7 +1391,11 @@ function ConflictList({ conflicts }: { conflicts: ImportConflict[] }) {
 const IMPORT_CUSTOM_OPEN = "__IMPORT_CUSTOM_OPEN__";
 const IMPORT_CUSTOM_SAVED = "__IMPORT_CUSTOM_SAVED__";
 
-function CustomImportRoleModal({
+/**
+ * Modal exportado para que los tests puedan montarlo aislado.
+ * Sigue usándose como subcomponente local dentro de OnboardingImportAdmin.
+ */
+export function CustomImportRoleModal({
   open,
   userName,
   previewRow,
@@ -1415,6 +1427,10 @@ function CustomImportRoleModal({
 
   const [template, setTemplate] = useState(defaultTemplate);
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [customName, setCustomName] = useState<string>(
+    initialSpec?.customRoleName?.trim() ?? ""
+  );
+  const [nameError, setNameError] = useState<string>("");
 
   useEffect(() => {
     if (!open) return;
@@ -1424,6 +1440,8 @@ function CustomImportRoleModal({
         ? initialSpec.permissions
         : rolePermissionsByName.get(defaultTemplate.toLowerCase()) ?? [];
     setSelected(new Set(codes));
+    setCustomName(initialSpec?.customRoleName?.trim() ?? "");
+    setNameError("");
   }, [open, defaultTemplate, initialSpec, rolePermissionsByName]);
 
   if (!open || !userName || !previewRow) return null;
@@ -1431,6 +1449,19 @@ function CustomImportRoleModal({
   const onTemplateChange = (t: string) => {
     setTemplate(t);
     setSelected(new Set(rolePermissionsByName.get(t.toLowerCase()) ?? []));
+  };
+
+  /**
+   * Misma regla que el backend (`uniqueRoleNameInOrg` recorta a 40 chars).
+   * El admin puede dejarlo vacío y el backend genera `Imp·<userName>` automático.
+   */
+  const validateCustomName = (raw: string): string => {
+    const trimmed = raw.trim();
+    if (!trimmed) return ""; // vacío = automático, válido
+    if (trimmed.length > 40) {
+      return "El nombre no puede pasar de 40 caracteres.";
+    }
+    return "";
   };
 
   const toggleCode = (code: string) => {
@@ -1447,7 +1478,17 @@ function CustomImportRoleModal({
     if (!t) return;
     const list = [...selected].filter(Boolean);
     if (list.length === 0) return;
-    onSave({ templateRoleName: t, permissions: list.sort((a, b) => a.localeCompare(b)) });
+    const nameTrim = customName.trim();
+    const err = validateCustomName(customName);
+    if (err) {
+      setNameError(err);
+      return;
+    }
+    onSave({
+      templateRoleName: t,
+      permissions: list.sort((a, b) => a.localeCompare(b)),
+      ...(nameTrim ? { customRoleName: nameTrim } : {}),
+    });
   };
 
   return (
@@ -1496,17 +1537,22 @@ function CustomImportRoleModal({
           </h3>
           <p style={{ margin: "8px 0 0", fontSize: 14, color: T.inkSecondary, lineHeight: 1.5 }}>
             Elige un <strong>rol base</strong> de la organización para copiar su lista inicial de permisos; luego
-            marca o desmarca libremente. Al importar se creará un <strong>rol nuevo</strong> en la org (nombre tipo{" "}
-            <code style={{ fontSize: 12 }}>Imp·…</code>) con exactamente lo que marques, y se asignará a esta
-            persona.
+            marca o desmarca libremente y, si quieres, asigna un <strong>nombre personalizado</strong> al rol
+            (ej. <em>Gerente Regional</em>). Al importar se creará un <strong>rol nuevo</strong> en la org con ese
+            nombre — o uno automático tipo <code style={{ fontSize: 12 }}>Imp·…</code> si lo dejas vacío — con
+            exactamente los permisos marcados, y se asignará a esta persona.
           </p>
         </header>
 
         <div style={{ padding: "12px 20px", borderBottom: `1px solid ${T.border}` }}>
-          <label style={{ display: "block", fontSize: 12, fontWeight: 600, color: T.inkSecondary, marginBottom: 6 }}>
+          <label
+            htmlFor="custom-import-role-template"
+            style={{ display: "block", fontSize: 12, fontWeight: 600, color: T.inkSecondary, marginBottom: 6 }}
+          >
             Rol base (plantilla)
           </label>
           <select
+            id="custom-import-role-template"
             value={template}
             onChange={(e) => onTemplateChange(e.target.value)}
             style={{
@@ -1525,6 +1571,57 @@ function CustomImportRoleModal({
               </option>
             ))}
           </select>
+
+          <label
+            htmlFor="custom-import-role-name"
+            style={{
+              display: "block",
+              fontSize: 12,
+              fontWeight: 600,
+              color: T.inkSecondary,
+              marginTop: 14,
+              marginBottom: 6,
+            }}
+          >
+            Nombre del rol personalizado <span style={{ color: T.inkMuted, fontWeight: 400 }}>(opcional)</span>
+          </label>
+          <input
+            id="custom-import-role-name"
+            type="text"
+            value={customName}
+            maxLength={40}
+            placeholder="Ej. Gerente Regional"
+            aria-describedby="custom-import-role-name-help"
+            aria-invalid={nameError ? true : undefined}
+            onChange={(e) => {
+              setCustomName(e.target.value);
+              if (nameError) setNameError(validateCustomName(e.target.value));
+            }}
+            onBlur={(e) => setNameError(validateCustomName(e.target.value))}
+            style={{
+              width: "100%",
+              maxWidth: 360,
+              padding: "8px 10px",
+              borderRadius: 8,
+              border: `1px solid ${nameError ? T.error : T.border}`,
+              fontSize: 14,
+              background: T.surface,
+              color: T.ink,
+            }}
+          />
+          <p
+            id="custom-import-role-name-help"
+            style={{
+              margin: "6px 0 0",
+              fontSize: 12,
+              color: nameError ? T.error : T.inkMuted,
+              lineHeight: 1.4,
+            }}
+          >
+            {nameError
+              ? nameError
+              : "Si lo dejas vacío, el sistema genera un nombre automático (Imp·…). Máx. 40 caracteres."}
+          </p>
         </div>
 
         <div style={{ overflowY: "auto", padding: "16px 20px", flex: 1 }}>
@@ -1720,7 +1817,9 @@ function RolePermissionsCell({
         }}
         title={
           hasCustom && customSpec
-            ? `Rol a medida desde base «${customSpec.templateRoleName}»`
+            ? customSpec.customRoleName?.trim()
+              ? `Rol a medida «${customSpec.customRoleName.trim()}» desde base «${customSpec.templateRoleName}»`
+              : `Rol a medida desde base «${customSpec.templateRoleName}»`
             : isOverridden && baseRoleName
               ? `Rol original del archivo: ${baseRoleName}`
               : "Cambiar rol asignado a esta persona"
@@ -1750,7 +1849,8 @@ function RolePermissionsCell({
         ) : null}
         {hasCustom && customSpec ? (
           <option value={IMPORT_CUSTOM_SAVED}>
-            Otro ✓ ({customSpec.templateRoleName}, {customSpec.permissions.length} perm.)
+            Otro ✓ ({customSpec.customRoleName?.trim() || `base: ${customSpec.templateRoleName}`},{" "}
+            {customSpec.permissions.length} perm.)
           </option>
         ) : null}
         {rolesAvailable.map((rn) => (
@@ -1761,7 +1861,16 @@ function RolePermissionsCell({
       </select>
       {hasCustom ? (
         <p style={{ margin: "4px 0 0", fontSize: 11, color: T.primary }}>
-          Se creará un rol nuevo al importar (nombre automático <code style={{ fontSize: 10 }}>Imp·…</code>).
+          {customSpec?.customRoleName?.trim() ? (
+            <>
+              Se creará el rol <strong>«{customSpec.customRoleName.trim()}»</strong> al importar.
+            </>
+          ) : (
+            <>
+              Se creará un rol nuevo al importar (nombre automático{" "}
+              <code style={{ fontSize: 10 }}>Imp·…</code>).
+            </>
+          )}
         </p>
       ) : isOverridden ? (
         <p style={{ margin: "4px 0 0", fontSize: 11, color: T.primary }}>
