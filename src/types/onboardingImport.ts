@@ -118,6 +118,12 @@ export interface PreviewImportResponse {
 export interface CustomImportRoleSpec {
   templateRoleName: string;
   permissions: string[];
+  /**
+   * Nombre con el que el admin quiere identificar el rol nuevo
+   * (ej. "Gerente Regional"). Si se omite o queda vacío, el backend
+   * genera uno automático con prefijo `Imp·…`.
+   */
+  customRoleName?: string;
 }
 
 export interface ApplyImportFailure {
