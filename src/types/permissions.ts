@@ -39,7 +39,9 @@ export type KnownPermission =
   | "permission:write"
   | "permission_group:manage"
   | "role:manage_permissions"
-  | "user:manage_permissions";
+  | "user:manage_permissions"
+  | "api_key:manage"
+  | "accounting:export";
 
 /** Response shape of `GET /api/user/me/permissions`. */
 export interface MePermissionsResponse {
