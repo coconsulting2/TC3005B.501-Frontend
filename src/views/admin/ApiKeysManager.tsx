@@ -167,7 +167,7 @@ export default function ApiKeysManager(_props: Props) {
     setOrgLabel(found?.nombre ?? nextId);
   };
 
-  const handleGenerate = async (e: React.FormEvent) => {
+  const handleGenerate: React.ComponentProps<"form">["onSubmit"] = async (e) => {
     e.preventDefault();
     if (!activeOrgId || !name.trim()) return;
     setGenerating(true);

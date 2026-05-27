@@ -37,6 +37,7 @@ export default function ReceiptItem({
   return (
     <ReceiptDetailCard
       {...cardProps}
+      receiptTypeName={receiptTypeName}
       validation={currentValidation}
       receiptId={receiptId}
     >
