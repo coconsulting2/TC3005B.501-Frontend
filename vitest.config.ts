@@ -60,6 +60,7 @@ export default defineConfig({
         "src/components/RolesAdmin.tsx",
         "src/components/SimuladorWorkflow.tsx",
         "src/components/RequestsLists/AuthRequestsList.tsx",
+        "src/views/admin/OnboardingImportAdmin.tsx",
       ],
       thresholds: {
         lines: 70,
