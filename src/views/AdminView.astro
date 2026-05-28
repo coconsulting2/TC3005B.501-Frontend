@@ -166,10 +166,9 @@ const roleVariant: Record<string, string> = {
                           message={`¿Estás seguro de que deseas eliminar al usuario ${user.user_name}? Esta acción no se puede deshacer.`}
                           modal_type="warning"
                           token={getCookie("token", Astro.cookies)}
+                          buttonClassName="text-sm text-error-500 hover:text-error-400 transition-colors font-medium cursor-pointer"
                         >
-                          <span class="text-sm text-accent-400 hover:text-accent-300 transition-colors font-medium cursor-pointer">
-                            Eliminar
-                          </span>
+                          Eliminar
                         </UltimateWrapper>
                       </div>
                     </td>
