@@ -118,15 +118,45 @@ export default function EmployeeCategoriesAdmin(_props: { token?: string }) {
           show={modalOpen}
           onClose={() => setModalOpen(false)}
         >
-          <form onSubmit={form.handleSubmit(onSubmit)} style={{ display: "grid", gap: "0.75rem" }}>
-            <label>Código<input {...form.register("code")} maxLength={40} />
-              {form.formState.errors.code && <small>{form.formState.errors.code.message}</small>}
-            </label>
-            <label>Nombre<input {...form.register("name")} maxLength={80} />
-              {form.formState.errors.name && <small>{form.formState.errors.name.message}</small>}
-            </label>
-            <label>Descripción<textarea {...form.register("description")} rows={3} maxLength={254} /></label>
-            <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>
+          <form onSubmit={form.handleSubmit(onSubmit)} style={{ display: "grid", gap: "1rem" }}>
+            <div style={{ display: "grid", gap: "0.35rem" }}>
+              <label style={{ fontWeight: 600, color: "#222", fontSize: "0.9rem" }}>
+                Código{form.formState.errors.code && <span style={{ color: "#e53e3e", marginLeft: "0.25rem" }}>*</span>}
+              </label>
+              <input
+                style={getInputStyle(!!form.formState.errors.code)}
+                placeholder="Ej: CAT-001"
+                maxLength={40}
+                {...form.register("code")}
+              />
+              {form.formState.errors.code && <small style={errorStyle}>{form.formState.errors.code.message}</small>}
+            </div>
+
+            <div style={{ display: "grid", gap: "0.35rem" }}>
+              <label style={{ fontWeight: 600, color: "#222", fontSize: "0.9rem" }}>
+                Nombre{form.formState.errors.name && <span style={{ color: "#e53e3e", marginLeft: "0.25rem" }}>*</span>}
+              </label>
+              <input
+                style={getInputStyle(!!form.formState.errors.name)}
+                placeholder="Ej: Administrativo"
+                maxLength={80}
+                {...form.register("name")}
+              />
+              {form.formState.errors.name && <small style={errorStyle}>{form.formState.errors.name.message}</small>}
+            </div>
+
+            <div style={{ display: "grid", gap: "0.35rem" }}>
+              <label style={{ fontWeight: 600, color: "#222", fontSize: "0.9rem" }}>Descripción</label>
+              <textarea
+                style={{ padding: "0.6rem 0.75rem", borderRadius: 4, border: "1px solid #d0d0d0", fontFamily: "inherit" }}
+                rows={3}
+                maxLength={254}
+                {...form.register("description")}
+              />
+              <small style={helperStyle}>Opcional</small>
+            </div>
+
+            <div style={{ display: "flex", gap: "0.75rem", justifyContent: "flex-end", paddingTop: "0.25rem" }}>
               <Button variant="border" color="primary" onClick={() => setModalOpen(false)}>Cancelar</Button>
               <Button type="submit" variant="filled" color="primary">{editing ? "Guardar" : "Crear"}</Button>
             </div>
@@ -139,5 +169,51 @@ export default function EmployeeCategoriesAdmin(_props: { token?: string }) {
   );
 }
 
-const th: React.CSSProperties = { textAlign: "left", padding: "0.5rem", borderBottom: "1px solid #ddd" };
+const th: React.CSSProperties = { textAlign: "left", padding: "0.5rem", borderBottom: "1px solid #ddd", fontWeight: "600" };
 const td: React.CSSProperties = { padding: "0.5rem", borderBottom: "1px solid #eee" };
+
+// Estilos reutilizables del formulario (coinciden con ExpensePoliciesAdmin)
+const labelStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "auto 1fr",
+  gap: "0.5rem",
+  alignItems: "flex-start",
+  fontSize: "0.9rem",
+  fontWeight: "500",
+  color: "#333",
+};
+
+const getInputStyle = (hasError: boolean): React.CSSProperties => ({
+  width: "100%",
+  padding: "0.6rem 0.75rem",
+  fontSize: "0.95rem",
+  border: `2px solid ${hasError ? "#e53e3e" : "#d0d0d0"}`,
+  borderRadius: "4px",
+  fontFamily: "inherit",
+  transition: "border-color 0.2s ease, box-shadow 0.2s ease",
+  backgroundColor: hasError ? "rgba(229, 62, 62, 0.05)" : "#fff",
+  boxShadow: hasError ? "0 0 0 3px rgba(229, 62, 62, 0.1)" : "none",
+});
+
+const getSelectStyle = (hasError: boolean): React.CSSProperties => ({
+  ...getInputStyle(hasError),
+  cursor: "pointer",
+  appearance: "none",
+  paddingRight: "2rem",
+  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23333' d='M6 9L1 4h10z'/%3E%3C/svg%3E")`,
+  backgroundRepeat: "no-repeat",
+  backgroundPosition: "right 0.75rem center",
+});
+
+const errorStyle: React.CSSProperties = {
+  color: "#e53e3e",
+  fontSize: "0.8rem",
+  marginTop: "0.25rem",
+  fontWeight: "500",
+};
+
+const helperStyle: React.CSSProperties = {
+  color: "#666",
+  fontSize: "0.8rem",
+  marginTop: "0.25rem",
+};
