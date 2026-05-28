@@ -43,8 +43,13 @@ const userId = getCookie("id", Astro.cookies);
     <div class="flex items-center gap-0.5 sm:gap-1">
       <NotificationBell client:load userId={userId} />
       <LogoutButton client:load>
-        <div class="p-2 rounded-[var(--radius-md)] text-[var(--color-ink-muted)] hover:bg-[var(--color-surface-secondary)] hover:text-[var(--color-ink)] transition-colors cursor-pointer">
-          <MaterialIcon icon="logout" color="currentColor" />
+        <div class="
+              p-0 m-0 flex align-middle justify-center
+               rounded-[var(--radius-md)] text-[var(--color-ink-muted)]
+                hover:bg-[var(--color-surface-secondary)] hover:text-[var(--color-ink)]
+                transition-colors cursor-pointer
+        ">
+          <MaterialIcon icon="logout" />
         </div>
       </LogoutButton>
     </div>

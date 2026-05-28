@@ -47,7 +47,7 @@ export default function LogoutButton({ children }: LogoutButtonProps) {
           <div className="flex gap-2">
             <button
               onClick={handleLogout}
-              className="flex-1 bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 transition-colors font-semibold"
+              className="flex-1 bg-red-600 text-white py-2 rounded-lg hover:bg-red-700 hover:cursor-pointer transition-colors font-semibold"
             >
               Cerrar Sesión
             </button>
