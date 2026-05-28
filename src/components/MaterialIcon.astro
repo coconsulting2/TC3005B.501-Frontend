@@ -10,7 +10,7 @@ const {
   icon, color = "white", style = "", variant = "outlined"
 } = Astro.props as Props;
 
-const className = `material-symbols-${variant} text-${color} ${style}`;
+const className = `material-symbols-${variant} text-${color} ${style} m-0 p-0`;
 ---
 
 <link rel="stylesheet" href={`https://fonts.googleapis.com/css2?family=Material+Symbols+${variant.charAt(0).toUpperCase() + variant.slice(1)}:opsz,wght,FILL,GRAD@20..48,100..700,1,0`} />
