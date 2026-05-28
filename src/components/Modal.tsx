@@ -75,7 +75,12 @@ export default function Modal({
     >
       <div
         ref={dialogRef}
-        className={`bg-[var(--color-surface-white)] border rounded-[var(--radius-lg)] p-6 w-[calc(100vw-2rem)] max-w-md min-w-[320px] ${MODAL_STYLES[type]}`}
+        className={`
+        bg-[var(--color-surface-white)] border rounded-[var(--radius-lg)] 
+        p-6 w-[calc(100vw-2rem)] max-w-5xl min-w-[320px] max-h-10/12 
+        scrollable overflow-y-scroll 
+        ${MODAL_STYLES[type]}
+        `}
         role="dialog"
         aria-modal="true"
         aria-labelledby="modal-title"
