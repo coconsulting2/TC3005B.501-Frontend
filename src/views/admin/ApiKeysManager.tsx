@@ -75,6 +75,7 @@ export default function ApiKeysManager(_props: Props) {
   const [name, setName] = useState("");
   const [expiresAt, setExpiresAt] = useState(defaultExpiresAt);
   const [generating, setGenerating] = useState(false);
+  const [copied, setCopied] = useState(false);
 
   const [revealedSecret, setRevealedSecret] = useState<ApiKeyGenerateResponse | null>(null);
   const [expandedLogsId, setExpandedLogsId] = useState<number | null>(null);
@@ -132,15 +133,16 @@ export default function ApiKeysManager(_props: Props) {
 
         if (canListAll) {
           const res = await apiRequest<OrganizationListResponse>("/organizations?pageSize=100");
-          setOrgs(res.data);
+          const orgsData = Array.isArray(res) ? res : (res.data ?? []);
+          setOrgs(orgsData);
           const impersonated = getImpersonatedOrgId();
-          if (impersonated) {
-            setOrgId(impersonated);
-            const found = res.data.find((o) => o.id === impersonated);
-            setOrgLabel(found?.nombre ?? impersonated);
-          } else if (res.data.length > 0) {
-            setOrgId(res.data[0].id);
-            setOrgLabel(res.data[0].nombre);
+          const impersonatedOrg = impersonated
+            ? orgsData.find((o: Organization) => String(o.id) === String(impersonated))
+            : undefined;
+          const defaultOrg = impersonatedOrg ?? orgsData[0];
+          if (defaultOrg) {
+            setOrgId(String(defaultOrg.id));
+            setOrgLabel(defaultOrg.nombre);
           }
         } else {
           const me = await apiRequest<Organization>("/organizations/me");
@@ -227,7 +229,9 @@ export default function ApiKeysManager(_props: Props) {
     if (!revealedSecret?.key) return;
     try {
       await navigator.clipboard.writeText(revealedSecret.key);
+      setCopied(true);
       setToast({ message: "Secreto copiado al portapapeles.", type: "success" });
+      setTimeout(() => setCopied(false), 2500);
     } catch {
       setToast({ message: "No se pudo copiar; selecciona el texto manualmente.", type: "error" });
     }
@@ -248,23 +252,34 @@ export default function ApiKeysManager(_props: Props) {
   return (
     <div className="p-6 space-y-8">
       {canPickOrg && orgs.length > 0 ? (
-        <label className="block text-sm max-w-md">
+        <label style={{ display: "block", fontSize: 14, maxWidth: 448 }}>
           <span style={{ color: T.inkSecondary }}>Organización</span>
           <select
-            className="mt-1 w-full border rounded px-3 py-2"
             value={orgId}
             onChange={(e) => handleOrgChange(e.target.value)}
+            style={{
+              display: "block",
+              width: "100%",
+              marginTop: 4,
+              padding: "8px 12px",
+              border: `1px solid ${T.border}`,
+              borderRadius: 6,
+              color: T.ink,
+              background: "#ffffff",
+              fontSize: 14,
+              cursor: "pointer",
+            }}
           >
             {orgs.map((o) => (
-              <option key={o.id} value={o.id}>
+              <option key={o.id} value={String(o.id)} style={{ color: "#000", background: "#fff" }}>
                 {o.nombre} ({o.status})
               </option>
             ))}
           </select>
         </label>
       ) : (
-        <p className="text-sm" style={{ color: T.inkSecondary }}>
-          Organización: <strong style={{ color: T.ink }}>{orgLabel || activeOrgId}</strong>
+        <p style={{ fontSize: 14, color: T.inkSecondary }}>
+          Organización: <strong style={{ color: T.ink }}>{orgLabel || orgId || "—"}</strong>
         </p>
       )}
 
@@ -407,43 +422,100 @@ export default function ApiKeysManager(_props: Props) {
 
       {revealedSecret && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4"
-          style={{ background: T.scrim }}
           role="dialog"
           aria-modal="true"
           aria-labelledby="api-key-secret-title"
+          onClick={(e) => { if (e.target === e.currentTarget) setRevealedSecret(null); }}
+          style={{
+            position: "fixed", inset: 0, zIndex: 60,
+            display: "flex", alignItems: "center", justifyContent: "center",
+            padding: 16, background: T.scrim,
+          }}
         >
           <div
-            className="max-w-lg w-full rounded-lg border p-6 space-y-4 shadow-xl"
-            style={{ background: T.surface, borderColor: T.border }}
+            style={{
+              width: "100%", maxWidth: 520,
+              maxHeight: "90vh", overflowY: "auto",
+              background: "#ffffff",
+              border: `1px solid ${T.border}`,
+              borderRadius: 10,
+              padding: 24,
+              boxShadow: "0 20px 60px rgba(0,0,0,0.3)",
+              display: "flex", flexDirection: "column", gap: 16,
+            }}
           >
-            <h3 id="api-key-secret-title" className="text-lg font-semibold" style={{ color: T.ink }}>
-              Guarda esta llave ahora
-            </h3>
-            <p className="text-sm" style={{ color: T.inkSecondary }}>
-              <strong>{revealedSecret.name}</strong> — el secreto no se volverá a mostrar.
-            </p>
-            <pre
-              className="p-3 rounded text-xs overflow-x-auto break-all"
-              style={{ background: "var(--color-surface-secondary)" }}
-            >
-              {revealedSecret.key}
-            </pre>
-            <div className="flex flex-wrap gap-2">
+            {/* Header */}
+            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12 }}>
+              <h3 id="api-key-secret-title" style={{ margin: 0, fontSize: 18, fontWeight: 600, color: T.ink }}>
+                Guarda esta llave ahora
+              </h3>
               <button
                 type="button"
-                className="px-4 py-2 rounded text-white text-sm"
-                style={{ background: T.primary }}
-                onClick={() => void copySecret()}
+                aria-label="Cerrar"
+                onClick={() => setRevealedSecret(null)}
+                style={{ background: "none", border: "none", fontSize: 22, lineHeight: 1, cursor: "pointer", color: T.inkSecondary, padding: "0 4px" }}
               >
-                Copiar secreto
+                ×
+              </button>
+            </div>
+
+            {/* Info */}
+            <p style={{ margin: 0, fontSize: 14, color: T.inkSecondary }}>
+              Llave: <strong style={{ color: T.ink }}>{revealedSecret.name}</strong>
+            </p>
+            <p style={{ margin: 0, fontSize: 13, fontWeight: 500, color: T.error }}>
+              El secreto no volverá a mostrarse. Cópialo ahora.
+            </p>
+
+            {/* Secreto */}
+            <div style={{ background: "#f5f5f3", border: `1px solid ${T.borderSoft}`, borderRadius: 6, padding: 12 }}>
+              <p style={{ margin: "0 0 6px", fontSize: 11, fontWeight: 600, color: T.inkSecondary, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                Secreto
+              </p>
+              <pre style={{
+                margin: 0, fontSize: 12, fontFamily: "monospace",
+                color: T.ink, wordBreak: "break-all", whiteSpace: "pre-wrap",
+                userSelect: "all", lineHeight: 1.6,
+              }}>
+                {revealedSecret.key}
+              </pre>
+            </div>
+
+            {/* Feedback de copiado */}
+            {copied && (
+              <div style={{
+                display: "flex", alignItems: "center", gap: 8,
+                background: "#f0fdf4", color: T.success,
+                border: "1px solid #bbf7d0", borderRadius: 6,
+                padding: "8px 14px", fontSize: 14, fontWeight: 500,
+              }}>
+                ✓ Secreto copiado al portapapeles
+              </div>
+            )}
+
+            {/* Botones */}
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+              <button
+                type="button"
+                onClick={() => void copySecret()}
+                style={{
+                  padding: "9px 18px", borderRadius: 6, border: "none",
+                  background: copied ? T.success : T.primary,
+                  color: "#ffffff", fontSize: 14, fontWeight: 500, cursor: "pointer",
+                }}
+              >
+                {copied ? "✓ Copiado" : "Copiar secreto"}
               </button>
               <button
                 type="button"
-                className="px-4 py-2 rounded border text-sm"
                 onClick={() => setRevealedSecret(null)}
+                style={{
+                  padding: "9px 18px", borderRadius: 6,
+                  border: `1px solid ${T.border}`, background: "transparent",
+                  color: T.inkSecondary, fontSize: 14, cursor: "pointer",
+                }}
               >
-                Ya la guardé
+                Ya la guardé, cerrar
               </button>
             </div>
           </div>
