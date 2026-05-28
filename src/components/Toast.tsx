@@ -34,7 +34,7 @@ export default function Toast({ message, type, duration = 4000 }: Props) {
 
   return (
     <div
-      className={`fixed top-6 right-6 z-50 w-[340px] max-w-full transition-transform duration-300 ease-in-out ${animate ? 'translate-x-0' : 'translate-x-[120%]'}`}
+      className={`fixed top-6 right-6 z-[100] w-[340px] max-w-full transition-transform duration-300 ease-in-out ${animate ? 'translate-x-0' : 'translate-x-[120%]'}`}
     >
       <div className={`border-l-4 p-4 rounded-[var(--radius-md)] shadow-[var(--shadow-md)] ${typeStyle[type]}`}>
         <div className="font-medium text-sm">{message}</div>
