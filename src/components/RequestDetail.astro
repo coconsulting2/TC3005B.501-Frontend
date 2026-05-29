@@ -13,7 +13,7 @@ import TextHeader from '@components/TextHeader.astro';
 import CommentsThread from '@components/comments/CommentsThread';
 import { getCookie } from "@data/cookies";
 import SolicitudTimeline from '@components/SolicitudTimeline';
-<<<<<<< HEAD
+import Button from '@components/Button.astro';
 
 const {
   request,
@@ -24,13 +24,10 @@ const {
   backHref = "/dashboard",
   showTimeline = true,
   showComments = true,
+  showUploadCTA,
 } = Astro.props;
 
 const username = getCookie("username", Astro.cookies) ?? "";
-=======
-import Button from '@components/Button.astro';
-const { request, title, subtitle, currentUserId, authToken, showUploadCTA } = Astro.props;
->>>>>>> Boton_comproba
 ---
 
 <main class="flex flex-col items-center">
