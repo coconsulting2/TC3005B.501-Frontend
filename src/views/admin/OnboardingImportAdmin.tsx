@@ -92,6 +92,8 @@ export default function OnboardingImportAdmin({ orgId }: Props) {
   const [previewApplyError, setPreviewApplyError] = useState("");
   /** Vista previa con `?create_new_org=1` (solo JSON con bloque organization + permiso crear org). */
   const [createNewOrgOption, setCreateNewOrgOption] = useState(false);
+  /** Nombre editable de la org nueva (sobrescribe el del JSON al aplicar). */
+  const [newOrgNameOverride, setNewOrgNameOverride] = useState("");
 
   /** Snapshot reactivo de impersonación (localStorage + evento al cambiar en la misma pestaña). */
   const [impersonatedOrgId, setImpersonatedOrgSnapshot] = useState<string | null>(null);
@@ -129,7 +131,12 @@ export default function OnboardingImportAdmin({ orgId }: Props) {
     setRoleOverridesByUser({});
     setCustomImportRolesByUser({});
     setPreviewApplyError("");
-    setCreateNewOrgOption(false);
+    setCreateNewOrgOption(Boolean(preview.previewCreateNewOrganization));
+    if (preview.organizationFromFile?.nombre) {
+      setNewOrgNameOverride(preview.organizationFromFile.nombre);
+    } else {
+      setNewOrgNameOverride("");
+    }
   }, [preview?.previewToken]);
 
   const handleFile = useCallback(
@@ -281,6 +288,12 @@ export default function OnboardingImportAdmin({ orgId }: Props) {
         if (role.trim()) roleOverridesPayload[un] = role.trim();
       }
 
+      const willCreateNewOrg = Boolean(preview.previewCreateNewOrganization);
+      if (willCreateNewOrg && !newOrgNameOverride.trim()) {
+        setPreviewApplyError("Indica el nombre de la organización nueva antes de importar.");
+        return;
+      }
+
       const res = await applyImportPreview(preview.previewToken, orgId, {
         roleMappings: preview.needsRoleMappingCount > 0 ? maps : undefined,
         roleOverrides:
@@ -289,7 +302,8 @@ export default function OnboardingImportAdmin({ orgId }: Props) {
           Object.keys(extrasPayload).length > 0 ? extrasPayload : undefined,
         passwordGlobal: g || undefined,
         passwordOverrides: Object.keys(pwdOverrides).length > 0 ? pwdOverrides : undefined,
-        createNewOrganization: Boolean(preview.previewCreateNewOrganization),
+        createNewOrganization: willCreateNewOrg,
+        newOrganizationName: willCreateNewOrg ? newOrgNameOverride.trim() : undefined,
         customImportRoles:
           Object.keys(customPayload).length > 0 ? customPayload : undefined,
       });
@@ -315,6 +329,7 @@ export default function OnboardingImportAdmin({ orgId }: Props) {
     setCustomImportRolesByUser({});
     setPreviewApplyError("");
     setCreateNewOrgOption(false);
+    setNewOrgNameOverride("");
   };
 
   return (
@@ -461,6 +476,9 @@ export default function OnboardingImportAdmin({ orgId }: Props) {
           }}
           applyError={previewApplyError}
           onDismissApplyError={() => setPreviewApplyError("")}
+          newOrgNameOverride={newOrgNameOverride}
+          onNewOrgNameOverrideChange={setNewOrgNameOverride}
+          impersonatedOrgId={impersonatedOrgId}
           onApply={handleApply}
           onReset={reset}
         />
@@ -542,6 +560,9 @@ function PreviewPanel({
   onRoleOverrideChange,
   applyError,
   onDismissApplyError,
+  newOrgNameOverride,
+  onNewOrgNameOverrideChange,
+  impersonatedOrgId,
   onApply,
   onReset,
 }: {
@@ -562,6 +583,9 @@ function PreviewPanel({
   onRoleOverrideChange: (userName: string, roleName: string) => void;
   applyError: string;
   onDismissApplyError: () => void;
+  newOrgNameOverride: string;
+  onNewOrgNameOverrideChange: (value: string) => void;
+  impersonatedOrgId: string | null;
   onApply: () => void;
   onReset: () => void;
 }) {
@@ -673,11 +697,55 @@ function PreviewPanel({
           </button>
         </div>
       ) : null}
-      {preview.organizationFromFile ? (
+      {preview.previewCreateNewOrganization ? (
+        <div
+          style={{
+            marginBottom: 16,
+            padding: "14px 16px",
+            borderRadius: 8,
+            border: `1px solid ${T.infoBorder}`,
+            background: T.infoBg,
+          }}
+        >
+          <p style={{ margin: "0 0 10px", fontSize: 14, color: T.ink }}>
+            Se creará una organización nueva y después se importarán los usuarios en ella.
+          </p>
+          <label style={{ display: "block", fontSize: 13, color: T.inkSecondary }}>
+            Nombre de la organización
+            <input
+              type="text"
+              value={newOrgNameOverride}
+              onChange={(e) => onNewOrgNameOverrideChange(e.target.value)}
+              maxLength={200}
+              placeholder={preview.organizationFromFile?.nombre ?? "Nombre de la empresa"}
+              style={{
+                display: "block",
+                width: "100%",
+                maxWidth: 420,
+                marginTop: 6,
+                padding: "8px 10px",
+                fontSize: 15,
+                border: `1px solid ${T.border}`,
+                borderRadius: 6,
+              }}
+            />
+          </label>
+          {preview.organizationFromFile?.nombre &&
+          newOrgNameOverride.trim() !== preview.organizationFromFile.nombre ? (
+            <p style={{ margin: "8px 0 0", fontSize: 12, color: T.inkMuted }}>
+              En el JSON venía «{preview.organizationFromFile.nombre}»; se usará el nombre indicado arriba.
+            </p>
+          ) : null}
+        </div>
+      ) : preview.organizationFromFile ? (
         <StatusBanner color={T.primary}>
-          {preview.previewCreateNewOrganization
-            ? `Se creará la organización «${preview.organizationFromFile.nombre}» y después se importarán los usuarios en esa org.`
-            : `El archivo describe la organización «${preview.organizationFromFile.nombre}»; los usuarios se crearán en la org destino actual (no se crea org nueva).`}
+          {`El archivo describe la organización «${preview.organizationFromFile.nombre}»; los usuarios se crearán en la org destino actual (no se crea org nueva).`}
+        </StatusBanner>
+      ) : null}
+      {!preview.previewCreateNewOrganization && !impersonatedOrgId ? (
+        <StatusBanner color={T.warning}>
+          Sin impersonación activa, los usuarios se importarán en la organización Ditta (ROOT).
+          Para importar en una org cliente, impersona esa organización desde Organizaciones.
         </StatusBanner>
       ) : null}
       {/* Resumen */}
