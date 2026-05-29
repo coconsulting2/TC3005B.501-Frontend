@@ -34,11 +34,18 @@ try {
   return Astro.redirect('/404');
 }
 
+<<<<<<< HEAD
 const isCxP = role === "Cuentas por pagar";
 const statusId = Number(request.request_status_id);
 const showExpenseValidation = isCxP && (statusId === 7 || statusId === 8);
 const canValidateReceipts = isCxP && statusId === 7;
 const backHref = isCxP ? "/todas-las-solicitudes" : "/dashboard";
+=======
+const showUploadCTA =
+  role === "Solicitante" &&
+  request?.request_status === "Comprobación gastos del viaje";
+
+>>>>>>> Boton_comproba
 ---
 
 <MainLayout title={`Detalle #${request.request_id}`} data={{ userName, buttonLabel, role }} >
@@ -46,6 +53,7 @@ const backHref = isCxP ? "/todas-las-solicitudes" : "/dashboard";
     request={request}
     currentUserId={userId ? parseInt(userId as string) : undefined}
     authToken={token as string}
+<<<<<<< HEAD
     backHref={backHref}
   >
     {showExpenseValidation && (
@@ -59,4 +67,8 @@ const backHref = isCxP ? "/todas-las-solicitudes" : "/dashboard";
       />
     )}
   </RequestDetail>
+=======
+    showUploadCTA={showUploadCTA}
+  />
+>>>>>>> Boton_comproba
 </MainLayout>
