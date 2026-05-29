@@ -33,6 +33,10 @@ try {
   return Astro.redirect('/404');
 }
 
+const showUploadCTA =
+  role === "Solicitante" &&
+  request?.request_status === "Comprobación gastos del viaje";
+
 ---
 
 <MainLayout title={`Detalle #${request.request_id}`} data={{ userName, buttonLabel, role }} >
@@ -40,5 +44,6 @@ try {
     request={request}
     currentUserId={userId ? parseInt(userId as string) : undefined}
     authToken={token as string}
+    showUploadCTA={showUploadCTA}
   />
 </MainLayout>
