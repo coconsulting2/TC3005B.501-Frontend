@@ -31,6 +31,8 @@ export type ApplyImportOptions = {
   passwordOverrides?: Record<string, string>;
   /** Debe coincidir con la vista previa generada con `create_new_org=1`. */
   createNewOrganization?: boolean;
+  /** Sobrescribe `organization.nombre` del JSON al crear org nueva (solo con createNewOrganization). */
+  newOrganizationName?: string;
 };
 
 function resolveApiBase(): string {
@@ -162,6 +164,12 @@ export async function applyImportPreview(
   }
   if (opts?.customImportRoles && Object.keys(opts.customImportRoles).length > 0) {
     body.customImportRoles = opts.customImportRoles;
+  }
+  if (opts?.createNewOrganization) {
+    body.createNewOrganization = true;
+  }
+  if (opts?.newOrganizationName?.trim()) {
+    body.newOrganizationName = opts.newOrganizationName.trim();
   }
 
   const res = await fetch(`${base}/onboarding/import/apply`, {
