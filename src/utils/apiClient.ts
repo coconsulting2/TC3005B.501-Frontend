@@ -20,6 +20,7 @@
 
 import { getSession } from "@data/cookies";
 import { getImpersonatedOrgId } from "@stores/organizationStore";
+import { isSessionError, handleSessionExpired } from "@utils/sessionExpiredHandler";
 
 const DEFAULT_API = "https://localhost:3000/api";
 
@@ -190,6 +191,10 @@ export async function apiRequest<T = any>(
       } catch {
         /* cuerpo no JSON */
       }
+      if (res.status === 401 && isSessionError(response)) {
+        handleSessionExpired();
+      }
+
       throw {
         status: res.status,
         response,
