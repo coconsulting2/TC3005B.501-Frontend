@@ -12,9 +12,10 @@ interface Props {
   children: React.ReactNode;
   token: string;
   redirectTo?: string;
+  buttonClassName?: string;
 }
 
-export default function UltimateWrapper({ 
+export default function UltimateWrapper({
 	user_id,
 	endpoint,
 	title,
@@ -22,7 +23,8 @@ export default function UltimateWrapper({
 	modal_type,
 	children,
 	token,
-	redirectTo = "/dashboard"
+	redirectTo = "/dashboard",
+	buttonClassName
 }: Props) {
 	const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
 	const handleConfirm = useCallback(async () => {
@@ -48,6 +50,7 @@ export default function UltimateWrapper({
 				button_type={modal_type === "warning" ? "danger" : modal_type}
 				modal_type={modal_type}
 				onConfirm={handleConfirm}
+				{...(buttonClassName ? { buttonClassName } : {})}
 			>
 				{children}
 			</ModalWrapper>
