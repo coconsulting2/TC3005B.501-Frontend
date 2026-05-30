@@ -6,6 +6,7 @@
  *   - Crear org nueva (wizard simple: datos fiscales + admin inicial).
  *   - Activar / Suspender una org existente.
  *   - Switch de impersonate (X-Organization-Id) para ver datos de la org como su admin.
+ *   - Ver usuarios de una org directamente (impersona + navega al dashboard).
  */
 import { useEffect, useState } from "react";
 import { apiRequest } from "@utils/apiClient";
@@ -18,6 +19,30 @@ import type {
   OrganizationListResponse,
   CreateOrganizationInput,
 } from "@type/organization";
+
+/** Tokens visuales alineados con global.css (mismo patrón que WorkflowRulesAdmin). */
+const T = {
+  ink: "var(--color-ink)",
+  inkSecondary: "var(--color-ink-secondary)",
+  inkMuted: "var(--color-ink-muted)",
+  surface: "var(--color-surface-white)",
+  surfaceMuted: "var(--color-surface-secondary)",
+  headerBg: "var(--color-surface-tertiary)",
+  border: "var(--color-neutral-300)",
+  borderSoft: "var(--color-neutral-200)",
+  rowAlt: "var(--color-surface-secondary)",
+  primary: "var(--color-primary-500)",
+  primaryHover: "var(--color-primary-600)",
+  success: "var(--color-success-600)",
+  successBg: "var(--color-success-50)",
+  successBorder: "var(--color-success-200)",
+  error: "var(--color-error-600)",
+  errorBg: "var(--color-error-50)",
+  errorBorder: "var(--color-error-200)",
+  warning: "var(--color-warning-700)",
+  warningBg: "var(--color-warning-50)",
+  warningBorder: "var(--color-warning-200)",
+} as const;
 
 interface Props {
   token?: string;
@@ -70,6 +95,12 @@ export default function OrganizationsAdmin(_: Props) {
     }
   };
 
+  const handleViewUsers = (orgId: string) => {
+    setImpersonatedOrgId(orgId);
+    setImpersonatedId(orgId);
+    window.location.href = "/dashboard";
+  };
+
   const handleSuspend = async (orgId: string) => {
     if (!confirm("¿Suspender esta organización? Sus usuarios no podrán entrar.")) return;
     try {
@@ -89,29 +120,35 @@ export default function OrganizationsAdmin(_: Props) {
     }
   };
 
+  const selectStyle: React.CSSProperties = {
+    border: `1px solid ${T.border}`,
+    borderRadius: 6,
+    padding: "4px 8px",
+    fontSize: 13,
+    color: T.ink,
+    background: T.surface,
+  };
+
+  const labelStyle: React.CSSProperties = {
+    fontSize: 13,
+    color: T.inkSecondary,
+  };
+
   return (
-    <div className="p-6 space-y-6">
-      <header className="flex flex-wrap items-center justify-between gap-4">
-        <div className="flex gap-3">
-          <label className="text-sm">
-            <span className="block text-gray-600">Tipo</span>
-            <select
-              className="border rounded px-2 py-1"
-              value={kindFilter}
-              onChange={(e) => setKindFilter(e.target.value as any)}
-            >
+    <div style={{ padding: 24, display: "flex", flexDirection: "column", gap: 20 }}>
+      <header style={{ display: "flex", flexWrap: "wrap", alignItems: "center", justifyContent: "space-between", gap: 16 }}>
+        <div style={{ display: "flex", gap: 16 }}>
+          <label style={labelStyle}>
+            <span style={{ display: "block", marginBottom: 4 }}>Tipo</span>
+            <select style={selectStyle} value={kindFilter} onChange={(e) => setKindFilter(e.target.value as any)}>
               <option value="">Todos</option>
               <option value="ROOT">ROOT (Ditta)</option>
               <option value="CLIENT">Cliente</option>
             </select>
           </label>
-          <label className="text-sm">
-            <span className="block text-gray-600">Estado</span>
-            <select
-              className="border rounded px-2 py-1"
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value as any)}
-            >
+          <label style={labelStyle}>
+            <span style={{ display: "block", marginBottom: 4 }}>Estado</span>
+            <select style={selectStyle} value={statusFilter} onChange={(e) => setStatusFilter(e.target.value as any)}>
               <option value="">Todos</option>
               <option value="CONFIGURING">En configuración</option>
               <option value="ACTIVE">Activa</option>
@@ -121,74 +158,133 @@ export default function OrganizationsAdmin(_: Props) {
         </div>
         <button
           onClick={() => setShowWizard(true)}
-          className="bg-blue-600 text-white px-4 py-2 rounded hover:bg-blue-700"
+          style={{
+            background: T.primary,
+            color: "#fff",
+            border: "none",
+            borderRadius: 8,
+            padding: "8px 16px",
+            fontSize: 14,
+            fontWeight: 600,
+            cursor: "pointer",
+          }}
         >
           + Nueva organización
         </button>
       </header>
 
       {impersonatedId && (
-        <div className="bg-yellow-50 border border-yellow-200 rounded p-3 text-sm flex items-center justify-between">
+        <div
+          style={{
+            background: T.warningBg,
+            border: `1px solid ${T.warningBorder}`,
+            borderRadius: 8,
+            padding: "10px 14px",
+            fontSize: 13,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 12,
+            color: T.warning,
+          }}
+        >
           <span>
             Estás viendo datos como org <strong>{impersonatedId}</strong>. Las queries usarán X-Organization-Id.
           </span>
           <button
-            onClick={() => {
-              setImpersonatedOrgId(null);
-              setImpersonatedId(null);
-            }}
-            className="text-yellow-900 underline"
+            onClick={() => { setImpersonatedOrgId(null); setImpersonatedId(null); }}
+            style={{ background: "none", border: "none", color: T.warning, cursor: "pointer", textDecoration: "underline", fontSize: 13 }}
           >
             Salir de impersonate
           </button>
         </div>
       )}
 
-      {error && <div className="bg-red-50 border border-red-200 text-red-800 rounded p-3">{error}</div>}
+      {error && (
+        <div
+          style={{
+            background: T.errorBg,
+            border: `1px solid ${T.errorBorder}`,
+            borderRadius: 8,
+            padding: "10px 14px",
+            fontSize: 13,
+            color: T.error,
+          }}
+        >
+          {error}
+        </div>
+      )}
 
       {loading ? (
-        <div>Cargando…</div>
+        <div style={{ color: T.inkMuted, fontSize: 14 }}>Cargando…</div>
       ) : (
-        <div className="overflow-x-auto">
-          <table className="min-w-full border">
-            <thead className="bg-gray-100">
-              <tr>
-                <th className="px-3 py-2 text-left">ID</th>
-                <th className="px-3 py-2 text-left">Nombre</th>
-                <th className="px-3 py-2 text-left">RFC</th>
-                <th className="px-3 py-2 text-left">Tipo</th>
-                <th className="px-3 py-2 text-left">Estado</th>
-                <th className="px-3 py-2 text-left">Acciones</th>
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+            <thead>
+              <tr style={{ background: T.headerBg }}>
+                {["ID", "Nombre", "RFC", "Tipo", "Estado", "Acciones"].map((h) => (
+                  <th
+                    key={h}
+                    style={{
+                      padding: "8px 12px",
+                      textAlign: "left",
+                      fontWeight: 600,
+                      color: T.inkSecondary,
+                      borderBottom: `1px solid ${T.border}`,
+                    }}
+                  >
+                    {h}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {orgs.map((o) => (
-                <tr key={o.id} className="border-t">
-                  <td className="px-3 py-2 font-mono text-xs">{o.id}</td>
-                  <td className="px-3 py-2">{o.nombre}</td>
-                  <td className="px-3 py-2">{o.rfc ?? "—"}</td>
-                  <td className="px-3 py-2">
-                    <span className={o.kind === "ROOT" ? "text-purple-700 font-semibold" : ""}>{o.kind}</span>
+              {orgs.map((o, i) => (
+                <tr
+                  key={o.id}
+                  style={{ background: i % 2 === 0 ? T.surface : T.rowAlt }}
+                >
+                  <td style={{ padding: "8px 12px", borderBottom: `1px solid ${T.borderSoft}`, fontFamily: "monospace", fontSize: 11, color: T.inkMuted }}>{o.id}</td>
+                  <td style={{ padding: "8px 12px", borderBottom: `1px solid ${T.borderSoft}`, color: T.ink, fontWeight: 500 }}>{o.nombre}</td>
+                  <td style={{ padding: "8px 12px", borderBottom: `1px solid ${T.borderSoft}`, color: T.inkSecondary }}>{o.rfc ?? "—"}</td>
+                  <td style={{ padding: "8px 12px", borderBottom: `1px solid ${T.borderSoft}` }}>
+                    <span style={{ color: o.kind === "ROOT" ? "var(--color-primary-700)" : T.ink, fontWeight: o.kind === "ROOT" ? 600 : 400 }}>
+                      {o.kind}
+                    </span>
                   </td>
-                  <td className="px-3 py-2">
+                  <td style={{ padding: "8px 12px", borderBottom: `1px solid ${T.borderSoft}` }}>
                     <StatusBadge status={o.status} />
                   </td>
-                  <td className="px-3 py-2 space-x-2 text-sm">
+                  <td style={{ padding: "8px 12px", borderBottom: `1px solid ${T.borderSoft}`, display: "flex", gap: 12, flexWrap: "wrap", alignItems: "center" }}>
+                    {o.kind !== "ROOT" && (
+                      <button
+                        onClick={() => handleViewUsers(o.id)}
+                        style={{ background: "none", border: "none", color: T.primary, cursor: "pointer", fontSize: 13, padding: 0, fontWeight: 500 }}
+                      >
+                        Ver usuarios
+                      </button>
+                    )}
                     {o.kind !== "ROOT" && (
                       <button
                         onClick={() => handleImpersonate(o.id)}
-                        className="text-blue-600 hover:underline"
+                        style={{ background: "none", border: "none", color: T.inkSecondary, cursor: "pointer", fontSize: 13, padding: 0 }}
                       >
                         {impersonatedId === o.id ? "Salir" : "Ver como"}
                       </button>
                     )}
                     {o.status !== "ACTIVE" && o.kind !== "ROOT" && (
-                      <button onClick={() => handleActivate(o.id)} className="text-green-600 hover:underline">
+                      <button
+                        onClick={() => handleActivate(o.id)}
+                        style={{ background: "none", border: "none", color: T.success, cursor: "pointer", fontSize: 13, padding: 0 }}
+                      >
                         Activar
                       </button>
                     )}
                     {o.status === "ACTIVE" && o.kind !== "ROOT" && (
-                      <button onClick={() => handleSuspend(o.id)} className="text-red-600 hover:underline">
+                      <button
+                        onClick={() => handleSuspend(o.id)}
+                        style={{ background: "none", border: "none", color: T.error, cursor: "pointer", fontSize: 13, padding: 0 }}
+                      >
                         Suspender
                       </button>
                     )}
@@ -197,7 +293,10 @@ export default function OrganizationsAdmin(_: Props) {
               ))}
               {orgs.length === 0 && (
                 <tr>
-                  <td colSpan={6} className="text-center text-gray-500 py-6">
+                  <td
+                    colSpan={6}
+                    style={{ textAlign: "center", color: T.inkMuted, padding: "32px 12px", fontSize: 13 }}
+                  >
                     Sin organizaciones para los filtros actuales.
                   </td>
                 </tr>
@@ -221,13 +320,17 @@ export default function OrganizationsAdmin(_: Props) {
 }
 
 function StatusBadge({ status }: { status: Organization["status"] }) {
-  const map: Record<Organization["status"], string> = {
-    CONFIGURING: "bg-gray-100 text-gray-800",
-    ACTIVE: "bg-green-100 text-green-800",
-    SUSPENDED: "bg-red-100 text-red-800",
+  const styles: Record<Organization["status"], React.CSSProperties> = {
+    CONFIGURING: { background: "var(--color-surface-secondary)", color: "var(--color-ink-secondary)", border: "1px solid var(--color-neutral-300)" },
+    ACTIVE:      { background: "var(--color-success-50)",        color: "var(--color-success-700)",   border: "1px solid var(--color-success-200)" },
+    SUSPENDED:   { background: "var(--color-error-50)",          color: "var(--color-error-700)",     border: "1px solid var(--color-error-200)" },
   };
   const label = { CONFIGURING: "En configuración", ACTIVE: "Activa", SUSPENDED: "Suspendida" }[status];
-  return <span className={`inline-block rounded px-2 py-0.5 text-xs ${map[status]}`}>{label}</span>;
+  return (
+    <span style={{ display: "inline-block", borderRadius: 999, padding: "2px 8px", fontSize: 11, fontWeight: 600, ...styles[status] }}>
+      {label}
+    </span>
+  );
 }
 
 function CreateOrganizationWizard({
@@ -254,7 +357,6 @@ function CreateOrganizationWizard({
     setSubmitting(true);
     setError(null);
     try {
-      // RFC vacío se manda como null para que el backend lo respete como opcional.
       const payload = { ...form, rfc: form.rfc?.trim() || null };
       await apiRequest("/organizations", { method: "POST", data: payload });
       onCreated();
@@ -265,84 +367,68 @@ function CreateOrganizationWizard({
     }
   };
 
+  const inputStyle: React.CSSProperties = {
+    width: "100%",
+    boxSizing: "border-box",
+    border: `1px solid var(--color-neutral-300)`,
+    borderRadius: 6,
+    padding: "7px 10px",
+    fontSize: 14,
+    color: "var(--color-ink)",
+    background: "var(--color-surface-white)",
+  };
+
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-lg p-6 w-full max-w-2xl space-y-4">
-        <h2 className="text-xl font-semibold">Nueva organización</h2>
+    <div style={{ position: "fixed", inset: 0, background: "rgba(10,10,10,0.45)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 50 }}>
+      <div style={{ background: "var(--color-surface-white)", borderRadius: 12, padding: 24, width: "100%", maxWidth: 560, display: "flex", flexDirection: "column", gap: 16 }}>
+        <h2 style={{ margin: 0, fontSize: 18, fontWeight: 600, color: "var(--color-ink)" }}>Nueva organización</h2>
 
-        {error && <div className="bg-red-50 border border-red-200 text-red-800 rounded p-3">{error}</div>}
+        {error && (
+          <div style={{ background: "var(--color-error-50)", border: "1px solid var(--color-error-200)", borderRadius: 8, padding: "10px 14px", fontSize: 13, color: "var(--color-error-700)" }}>
+            {error}
+          </div>
+        )}
 
-        <fieldset className="space-y-2">
-          <legend className="font-medium">Datos fiscales</legend>
-          <input
-            className="w-full border rounded px-2 py-1"
-            placeholder="Nombre comercial *"
-            value={form.nombre}
-            onChange={(e) => setForm({ ...form, nombre: e.target.value })}
-          />
-          <input
-            className="w-full border rounded px-2 py-1"
-            placeholder="Razón social"
-            value={form.razonSocial ?? ""}
-            onChange={(e) => setForm({ ...form, razonSocial: e.target.value })}
-          />
-          <input
-            className="w-full border rounded px-2 py-1"
-            placeholder="RFC (opcional)"
-            value={form.rfc ?? ""}
-            onChange={(e) => setForm({ ...form, rfc: e.target.value })}
-          />
-          <div className="grid grid-cols-2 gap-2">
-            <input
-              className="border rounded px-2 py-1"
-              placeholder="Zona horaria"
-              value={form.timezone}
-              onChange={(e) => setForm({ ...form, timezone: e.target.value })}
-            />
-            <input
-              className="border rounded px-2 py-1"
-              placeholder="Moneda base"
-              value={form.baseCurrency}
-              onChange={(e) => setForm({ ...form, baseCurrency: e.target.value })}
-            />
+        <fieldset style={{ border: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+          <legend style={{ fontWeight: 600, fontSize: 14, color: "var(--color-ink)", marginBottom: 8 }}>Datos fiscales</legend>
+          <input style={inputStyle} placeholder="Nombre comercial *" value={form.nombre} onChange={(e) => setForm({ ...form, nombre: e.target.value })} />
+          <input style={inputStyle} placeholder="Razón social" value={form.razonSocial ?? ""} onChange={(e) => setForm({ ...form, razonSocial: e.target.value })} />
+          <input style={inputStyle} placeholder="RFC (opcional)" value={form.rfc ?? ""} onChange={(e) => setForm({ ...form, rfc: e.target.value })} />
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+            <input style={inputStyle} placeholder="Zona horaria" value={form.timezone} onChange={(e) => setForm({ ...form, timezone: e.target.value })} />
+            <input style={inputStyle} placeholder="Moneda base" value={form.baseCurrency} onChange={(e) => setForm({ ...form, baseCurrency: e.target.value })} />
           </div>
         </fieldset>
 
-        <fieldset className="space-y-2">
-          <legend className="font-medium">Administrador inicial</legend>
-          <input
-            className="w-full border rounded px-2 py-1"
-            placeholder="Nombre completo *"
-            value={form.adminNombre}
-            onChange={(e) => setForm({ ...form, adminNombre: e.target.value })}
-          />
-          <input
-            className="w-full border rounded px-2 py-1"
-            placeholder="Email *"
-            type="email"
-            value={form.adminEmail}
-            onChange={(e) => setForm({ ...form, adminEmail: e.target.value })}
-          />
-          <input
-            className="w-full border rounded px-2 py-1"
-            placeholder="Contraseña inicial *"
-            type="password"
-            value={form.adminPassword}
-            onChange={(e) => setForm({ ...form, adminPassword: e.target.value })}
-          />
-          <p className="text-xs text-gray-500">
-            El admin podrá cambiar su contraseña al primer ingreso.
-          </p>
+        <fieldset style={{ border: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+          <legend style={{ fontWeight: 600, fontSize: 14, color: "var(--color-ink)", marginBottom: 8 }}>Administrador inicial</legend>
+          <input style={inputStyle} placeholder="Nombre completo *" value={form.adminNombre} onChange={(e) => setForm({ ...form, adminNombre: e.target.value })} />
+          <input style={inputStyle} placeholder="Email *" type="email" value={form.adminEmail} onChange={(e) => setForm({ ...form, adminEmail: e.target.value })} />
+          <input style={inputStyle} placeholder="Contraseña inicial *" type="password" value={form.adminPassword} onChange={(e) => setForm({ ...form, adminPassword: e.target.value })} />
+          <p style={{ margin: 0, fontSize: 12, color: "var(--color-ink-muted)" }}>El admin podrá cambiar su contraseña al primer ingreso.</p>
         </fieldset>
 
-        <div className="flex justify-end gap-2">
-          <button onClick={onClose} className="px-4 py-2 rounded border" disabled={submitting}>
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 8 }}>
+          <button
+            onClick={onClose}
+            disabled={submitting}
+            style={{ padding: "8px 16px", borderRadius: 8, border: `1px solid var(--color-neutral-300)`, background: "var(--color-surface-white)", color: "var(--color-ink)", fontSize: 14, cursor: "pointer" }}
+          >
             Cancelar
           </button>
           <button
             onClick={handleSubmit}
             disabled={submitting || !form.nombre || !form.adminEmail || !form.adminPassword}
-            className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-300"
+            style={{
+              padding: "8px 16px",
+              borderRadius: 8,
+              border: "none",
+              background: submitting || !form.nombre || !form.adminEmail || !form.adminPassword ? "var(--color-neutral-300)" : "var(--color-primary-500)",
+              color: "#fff",
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: submitting || !form.nombre || !form.adminEmail || !form.adminPassword ? "not-allowed" : "pointer",
+            }}
           >
             {submitting ? "Creando…" : "Crear organización"}
           </button>
