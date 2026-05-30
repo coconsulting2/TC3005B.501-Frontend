@@ -51,6 +51,8 @@ export interface ImportUserPreview {
    * Sirve para avisar al admin antes de aplicar.
    */
   hasFilePassword?: boolean;
+  /** true cuando el rol fue inferido automáticamente por jerarquía de jefe inmediato. */
+  roleAutoDetected?: boolean;
 }
 
 /** Referencia: roles definidos en la org y sus permisos por rol. */
