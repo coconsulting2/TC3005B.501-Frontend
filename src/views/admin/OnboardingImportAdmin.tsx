@@ -1859,7 +1859,27 @@ function RolePermissionsCell({
         </>
       ) : (
         <>
-          <div style={{ fontWeight: 600, color: T.ink }}>{row.roleName ?? "—"}</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap" }}>
+            <span style={{ fontWeight: 600, color: T.ink }}>{row.roleName ?? "—"}</span>
+            {row.roleAutoDetected && !isOverridden ? (
+              <span
+                title="Rol asignado automáticamente por jerarquía de jefe inmediato. Puedes cambiarlo."
+                style={{
+                  display: "inline-block",
+                  padding: "1px 7px",
+                  fontSize: 10,
+                  fontWeight: 600,
+                  borderRadius: 999,
+                  background: "var(--color-primary-50, #eff6ff)",
+                  color: "var(--color-primary-600, #2563eb)",
+                  border: "1px solid var(--color-primary-200, #bfdbfe)",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                auto-detectado
+              </span>
+            ) : null}
+          </div>
           <p style={{ margin: "6px 0 4px", fontSize: 12, color: T.inkMuted }}>
             {nRole} permiso{nRole !== 1 ? "s" : ""} efectivos (rol + base solicitante del sistema)
             {extraCount > 0 ? (
