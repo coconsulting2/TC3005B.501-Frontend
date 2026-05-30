@@ -39,6 +39,10 @@ const statusId = Number(request.request_status_id);
 const showExpenseValidation = isCxP && (statusId === 7 || statusId === 8);
 const canValidateReceipts = isCxP && statusId === 7;
 const backHref = isCxP ? "/todas-las-solicitudes" : "/dashboard";
+
+const showUploadCTA =
+  role === "Solicitante" &&
+  request?.request_status === "Comprobación gastos del viaje";
 ---
 
 <MainLayout title={`Detalle #${request.request_id}`} data={{ userName, buttonLabel, role }} >
@@ -47,6 +51,7 @@ const backHref = isCxP ? "/todas-las-solicitudes" : "/dashboard";
     currentUserId={userId ? parseInt(userId as string) : undefined}
     authToken={token as string}
     backHref={backHref}
+    showUploadCTA={showUploadCTA}
   >
     {showExpenseValidation && (
       <RequestExpensesValidationSection

@@ -13,6 +13,7 @@ import TextHeader from '@components/TextHeader.astro';
 import CommentsThread from '@components/comments/CommentsThread';
 import { getCookie } from "@data/cookies";
 import SolicitudTimeline from '@components/SolicitudTimeline';
+import Button from '@components/Button.astro';
 
 const {
   request,
@@ -23,6 +24,7 @@ const {
   backHref = "/dashboard",
   showTimeline = true,
   showComments = true,
+  showUploadCTA,
 } = Astro.props;
 
 const username = getCookie("username", Astro.cookies) ?? "";
@@ -44,6 +46,20 @@ const username = getCookie("username", Astro.cookies) ?? "";
     <p class="mb-12 text-lg">
       <span class="font-medium text-gray-700">Estado: </span><strong>{request.request_status.toUpperCase()}</strong>
     </p>
+
+    {showUploadCTA && (
+      <div class="mb-8 flex items-start justify-between gap-4 rounded-[var(--radius-md)] border border-primary-200 bg-primary-50 px-5 py-4">
+        <div class="flex flex-col gap-1">
+          <p class="font-medium text-[var(--color-ink)]">Esta solicitud requiere comprobación de gastos</p>
+          <p class="text-sm text-[var(--color-ink-muted)]">Suba sus comprobantes para continuar con el proceso.</p>
+        </div>
+        <a href={`/comprobar-solicitud/${request.request_id}`} class="shrink-0">
+          <Button variant="filled" color="primary" size="medium">
+            Subir comprobantes
+          </Button>
+        </a>
+      </div>
+    )}
 
     <div class="grid grid-cols-2 gap-12 text-lg mb-8">
       <section class="space-y-4">
