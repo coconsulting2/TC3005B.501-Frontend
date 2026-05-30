@@ -11,13 +11,13 @@ import Modal from "@components/Modal";
 import Toast from "@components/Toast";
 import { apiRequest } from "@utils/apiClient";
 
-const VALID_SCOPES = ["nacional", "internacional", "any"] as const;
+const VALID_SCOPES = ["nacional", "internacional", "Any"] as const;
 const VALID_CAP_UNITS = ["per_night", "per_trip", "per_day", "per_event"] as const;
 
 const policySchema = z.object({
   name: z.string().trim().min(1, "Requerido").max(120, "Máximo 120 caracteres"),
   categoryId: z.union([z.coerce.number().int().positive(), z.literal("")]).optional(),
-  destinationScope: z.enum(VALID_SCOPES).default("any"),
+  destinationScope: z.enum(VALID_SCOPES).default("Any"),
   costsCenter: z.string().trim().max(20).optional().nullable(),
   dailyPerDiem: z.union([z.coerce.number().min(0), z.literal("")]).optional(),
   currency: z.string().length(3).default("MXN"),
@@ -68,7 +68,7 @@ interface ReceiptType {
   receiptTypeName: string;
 }
 
-interface Props { token?: string }
+interface Props { token: string }
 
 const RECEIPT_TYPES_FALLBACK: ReceiptType[] = [
   { receiptTypeId: 1, receiptTypeName: "Hospedaje" },
@@ -91,7 +91,7 @@ export default function ExpensePoliciesAdmin(_props: Props) {
   const form = useForm<PolicyFormData>({
     resolver: zodResolver(policySchema) as any,
     defaultValues: {
-      name: "", destinationScope: "any", currency: "MXN",
+      name: "", destinationScope: "Any", currency: "MXN",
       validFrom: "", validTo: "", caps: [], categoryId: "" as any,
     },
   });
@@ -105,8 +105,8 @@ export default function ExpensePoliciesAdmin(_props: Props) {
     setLoading(true);
     try {
       const [polRes, catRes] = await Promise.all([
-        apiRequest<{ policies: Policy[] }>("/policies"),
-        apiRequest<{ categories: Category[] }>("/employee-categories"),
+        apiRequest<{ policies: Policy[] }>("/policies", { headers: { Authorization: `Bearer ${_props.token}`}}),
+        apiRequest<{ categories: Category[] }>("/employee-categories", { headers: { Authorization: `Bearer ${_props.token}`}}),
       ]);
       setPolicies(polRes.policies || []);
       setCategories(catRes.categories || []);
@@ -121,7 +121,7 @@ export default function ExpensePoliciesAdmin(_props: Props) {
   function openCreate() {
     setEditing(null);
     form.reset({
-      name: "", destinationScope: "any", currency: "MXN",
+      name: "", destinationScope: "Any", currency: "MXN",
       validFrom: new Date().toISOString().slice(0, 10), validTo: "", caps: [], categoryId: "" as any,
     });
     setModalOpen(true);
@@ -132,7 +132,7 @@ export default function ExpensePoliciesAdmin(_props: Props) {
     form.reset({
       name: p.name,
       categoryId: (p.categoryId ?? "") as any,
-      destinationScope: (p.destinationScope as any) || "any",
+      destinationScope: (p.destinationScope as any) || "Any",
       costsCenter: p.costsCenter || "",
       dailyPerDiem: (p.dailyPerDiem == null ? "" : Number(p.dailyPerDiem)) as any,
       currency: p.currency || "MXN",
@@ -158,10 +158,10 @@ export default function ExpensePoliciesAdmin(_props: Props) {
     };
     try {
       if (editing) {
-        await apiRequest(`/policies/${editing.policyId}`, { method: "PUT", data: payload });
+        await apiRequest(`/policies/${editing.policyId}`, { method: "PUT", data: payload, headers: { Authorization: `Bearer ${_props.token}`} });
         setToast({ message: "Política actualizada.", type: "success" });
       } else {
-        await apiRequest("/policies", { method: "POST", data: payload });
+        await apiRequest("/policies", { method: "POST", data: payload, headers: { Authorization: `Bearer ${_props.token}`}});
         setToast({ message: "Política creada.", type: "success" });
       }
       setModalOpen(false);
@@ -175,7 +175,7 @@ export default function ExpensePoliciesAdmin(_props: Props) {
   async function onDelete(p: Policy) {
     if (!confirm(`¿Desactivar la política "${p.name}"?`)) return;
     try {
-      await apiRequest(`/policies/${p.policyId}`, { method: "DELETE" });
+      await apiRequest(`/policies/${p.policyId}`, { method: "DELETE", headers: { Authorization: `Bearer ${_props.token}`}});
       setToast({ message: "Política desactivada.", type: "success" });
       void loadAll();
     } catch (e: any) {
@@ -227,71 +227,295 @@ export default function ExpensePoliciesAdmin(_props: Props) {
         </tbody>
       </table>
 
-      {modalOpen && (
-        <Modal
-          title={editing ? "Editar política" : "Nueva política"}
-          message="Configura nombre, vigencia, alcance y topes por tipo de gasto."
-          show={modalOpen}
-          onClose={() => setModalOpen(false)}
-        >
-          <form onSubmit={form.handleSubmit(onSubmit)} style={{ display: "grid", gap: "0.75rem" }}>
-            <label>
-              Nombre
-              <input {...form.register("name")} />
-              {form.formState.errors.name && <small>{form.formState.errors.name.message}</small>}
-            </label>
-            <label>
-              Categoría de empleado
-              <Controller name="categoryId" control={form.control} render={({ field }) => (
-                <select {...field} value={field.value as any}>
-                  <option value="">—</option>
-                  {categories.map((c) => <option key={c.categoryId} value={c.categoryId}>{c.name}</option>)}
-                </select>
-              )} />
-            </label>
-            <label>
-              Alcance de destino
-              <select {...form.register("destinationScope")}>
-                {VALID_SCOPES.map((s) => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </label>
-            <label>Centro de costos<input {...form.register("costsCenter")} maxLength={20} /></label>
-            <label>Viático diario (MXN)<input type="number" step="0.01" {...form.register("dailyPerDiem")} /></label>
-            <label>Vigencia desde<input type="date" {...form.register("validFrom")} /></label>
-            <label>Vigencia hasta<input type="date" {...form.register("validTo")} /></label>
+        {modalOpen && (
+         <Modal
+           title={editing ? "Editar política" : "Nueva política"}
+           message="Configura nombre, vigencia, alcance y topes por tipo de gasto."
+           show={modalOpen}
+           onClose={() => setModalOpen(false)}
+         >
+           <form onSubmit={form.handleSubmit(onSubmit)} className="max-h-10/12" style={{ display: "grid", gap: "1.25rem" }}>
+             {/* Nombre */}
+             <div style={{ display: "grid", gap: "0.35rem" }}>
+               <label style={{ fontWeight: "600", color: "#222", fontSize: "0.9rem" }}>
+                 Nombre
+                 {form.formState.errors.name && <span style={{ color: "#e53e3e", marginLeft: "0.25rem" }}>*</span>}
+               </label>
+               <input
+                 style={getInputStyle(!!form.formState.errors.name)}
+                 placeholder="Ej: Política Nacional 2026"
+                 {...form.register("name")}
+               />
+               {form.formState.errors.name && <small style={errorStyle}>{form.formState.errors.name.message}</small>}
+             </div>
 
-            <fieldset style={{ border: "1px solid #ccc", padding: "0.75rem" }}>
-              <legend>Topes por tipo de gasto</legend>
-              {fields.map((f, i) => (
-                <div key={f.id} style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr auto", gap: "0.5rem", marginBottom: "0.5rem" }}>
-                  <select {...form.register(`caps.${i}.receiptTypeId`)}>
-                    {receiptTypes.map((rt) => <option key={rt.receiptTypeId} value={rt.receiptTypeId}>{rt.receiptTypeName}</option>)}
-                  </select>
-                  <input type="number" step="0.01" placeholder="Tope" {...form.register(`caps.${i}.capAmount`)} />
-                  <select {...form.register(`caps.${i}.capUnit`)}>
-                    {VALID_CAP_UNITS.map((u) => <option key={u} value={u}>{u}</option>)}
-                  </select>
-                  <Button variant="border" color="accent" size="small" onClick={() => remove(i)}>Quitar</Button>
-                </div>
-              ))}
-              <Button variant="border" color="primary" size="small"
-                onClick={() => append({ receiptTypeId: receiptTypes[0]?.receiptTypeId || 1, capAmount: 0, capUnit: "per_event", currency: "MXN" })}>
-                + Agregar tope
-              </Button>
-            </fieldset>
+             {/* Categoría de empleado */}
+             <div style={{ display: "grid", gap: "0.35rem" }}>
+               <label style={{ fontWeight: "600", color: "#222", fontSize: "0.9rem" }}>
+                 Categoría de empleado
+               </label>
+               <Controller
+                 name="categoryId"
+                 control={form.control}
+                 render={({ field }) => (
+                   <select
+                     style={getSelectStyle(!!form.formState.errors.categoryId)}
+                     {...field}
+                     value={field.value as any}
+                   >
+                     <option value="">— Ninguna —</option>
+                     {categories.map((c) => (
+                       <option key={c.categoryId} value={c.categoryId}>
+                         {c.name}
+                       </option>
+                     ))}
+                   </select>
+                 )}
+               />
+               {form.formState.errors.categoryId && (
+                 <small style={errorStyle}>{form.formState.errors.categoryId.message}</small>
+               )}
+             </div>
 
-            <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>
-              <Button variant="border" color="primary" onClick={() => setModalOpen(false)}>Cancelar</Button>
-              <Button type="submit" variant="filled" color="primary">{editing ? "Guardar" : "Crear"}</Button>
-            </div>
-          </form>
-        </Modal>
-      )}
+             {/* Alcance de destino */}
+             <div style={{ display: "grid", gap: "0.35rem" }}>
+               <label style={{ fontWeight: "600", color: "#222", fontSize: "0.9rem" }}>
+                 Alcance de destino
+               </label>
+               <select
+                 style={getSelectStyle(!!form.formState.errors.destinationScope)}
+                 {...form.register("destinationScope")}
+               >
+                 <option value="Any">Cualquiera</option>
+                 <option value="nacional">Nacional</option>
+                 <option value="internacional">Internacional</option>
+               </select>
+             </div>
+
+             {/* Centro de costos */}
+             <div style={{ display: "grid", gap: "0.35rem" }}>
+               <label style={{ fontWeight: "600", color: "#222", fontSize: "0.9rem" }}>
+                 Centro de costos
+               </label>
+               <input
+                 style={getInputStyle(!!form.formState.errors.costsCenter)}
+                 placeholder="Ej: CC001"
+                 maxLength={20}
+                 {...form.register("costsCenter")}
+               />
+               <small style={helperStyle}>Máximo 20 caracteres (opcional)</small>
+             </div>
+
+             {/* Viático diario */}
+             <div style={{ display: "grid", gap: "0.35rem" }}>
+               <label style={{ fontWeight: "600", color: "#222", fontSize: "0.9rem" }}>
+                 Viático diario (MXN)
+               </label>
+               <input
+                 type="number"
+                 step="0.01"
+                 min="0"
+                 style={getInputStyle(!!form.formState.errors.dailyPerDiem)}
+                 placeholder="0.00"
+                 {...form.register("dailyPerDiem")}
+               />
+               <small style={helperStyle}>Opcionales</small>
+             </div>
+
+             {/* Vigencia desde y hasta */}
+             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1rem" }}>
+               <div style={{ display: "grid", gap: "0.35rem" }}>
+                 <label style={{ fontWeight: "600", color: "#222", fontSize: "0.9rem" }}>
+                   Vigencia desde
+                   {form.formState.errors.validFrom && <span style={{ color: "#e53e3e", marginLeft: "0.25rem" }}>*</span>}
+                 </label>
+                 <input
+                   type="date"
+                   style={getInputStyle(!!form.formState.errors.validFrom)}
+                   {...form.register("validFrom")}
+                 />
+                 <small style={helperStyle}>Requerido</small>
+                 {form.formState.errors.validFrom && (
+                   <small style={errorStyle}>{form.formState.errors.validFrom.message}</small>
+                 )}
+               </div>
+               <div style={{ display: "grid", gap: "0.35rem" }}>
+                 <label style={{ fontWeight: "600", color: "#222", fontSize: "0.9rem" }}>
+                   Vigencia hasta
+                 </label>
+                 <input
+                   type="date"
+                   style={getInputStyle(!!form.formState.errors.validTo)}
+                   {...form.register("validTo")}
+                 />
+                 <small style={helperStyle}>Opcional</small>
+               </div>
+             </div>
+
+             {/* Topes por tipo de gasto */}
+             <fieldset
+               style={{
+                 border: "2px solid #e2e8f0",
+                 borderRadius: "6px",
+                 padding: "1rem",
+                 backgroundColor: "#f8fafc",
+               }}
+             >
+               <legend style={{ fontWeight: "600", color: "#222", padding: "0 0.5rem" }}>
+                 Topes por tipo de gasto
+               </legend>
+               <div style={{ display: "grid", gap: "0.75rem" }}>
+                 {fields.map((f, i) => (
+                   <div
+                     key={f.id}
+                     style={{
+                       display: "grid",
+                       gridTemplateColumns: "1fr 1fr 1fr auto",
+                       gap: "0.6rem",
+                       alignItems: "flex-start",
+                       padding: "0.75rem",
+                       backgroundColor: "#fff",
+                       border: "1px solid #e2e8f0",
+                       borderRadius: "4px",
+                     }}
+                   >
+                     <div style={{ display: "grid", gap: "0.25rem" }}>
+                       <select
+                         style={getSelectStyle(!!form.formState.errors.caps?.[i]?.receiptTypeId)}
+                         {...form.register(`caps.${i}.receiptTypeId`)}
+                       >
+                         {receiptTypes.map((rt) => (
+                           <option key={rt.receiptTypeId} value={rt.receiptTypeId}>
+                             {rt.receiptTypeName}
+                           </option>
+                         ))}
+                       </select>
+                       {form.formState.errors.caps?.[i]?.receiptTypeId && (
+                         <small style={errorStyle}>Requerido</small>
+                       )}
+                     </div>
+                     <div style={{ display: "grid", gap: "0.25rem" }}>
+                       <input
+                         type="number"
+                         step="0.01"
+                         min="0"
+                         style={getInputStyle(!!form.formState.errors.caps?.[i]?.capAmount)}
+                         placeholder="Tope"
+                         {...form.register(`caps.${i}.capAmount`)}
+                       />
+                       {form.formState.errors.caps?.[i]?.capAmount && (
+                         <small style={errorStyle}>Mín. 0</small>
+                       )}
+                     </div>
+                     <div style={{ display: "grid", gap: "0.25rem" }}>
+                       <select
+                         style={getSelectStyle(!!form.formState.errors.caps?.[i]?.capUnit)}
+                         {...form.register(`caps.${i}.capUnit`)}
+                       >
+                         <option value="per_night">Por noche</option>
+                         <option value="per_trip">Por viaje</option>
+                         <option value="per_day">Por día</option>
+                         <option value="per_event">Por evento</option>
+                       </select>
+                       {form.formState.errors.caps?.[i]?.capUnit && (
+                         <small style={errorStyle}>Requerido</small>
+                       )}
+                     </div>
+                     <div style={{ paddingTop: "0.35rem" }}>
+                       <Button
+                         variant="border"
+                         color="accent"
+                         size="small"
+                         onClick={() => remove(i)}
+                       >
+                         Quitar
+                       </Button>
+                     </div>
+                   </div>
+                 ))}
+                 <Button
+                   variant="border"
+                   color="primary"
+                   size="small"
+                   onClick={() =>
+                     append({
+                       receiptTypeId: receiptTypes[0]?.receiptTypeId || 1,
+                       capAmount: 0,
+                       capUnit: "per_event",
+                       currency: "MXN",
+                     })
+                   }
+                 >
+                   + Agregar tope
+                 </Button>
+               </div>
+             </fieldset>
+
+             {/* Botones de acción */}
+             <div style={{ display: "flex", gap: "0.75rem", justifyContent: "flex-end", paddingTop: "0.5rem" }}>
+               <Button variant="border" color="primary" onClick={() => setModalOpen(false)}>
+                 Cancelar
+               </Button>
+               <Button type="submit" variant="filled" color="primary">
+                 {editing ? "Guardar cambios" : "Crear política"}
+               </Button>
+             </div>
+           </form>
+         </Modal>
+       )}
 
       {toast && <Toast message={toast.message} type={toast.type} />}
     </div>
   );
 }
 
-const th: React.CSSProperties = { textAlign: "left", padding: "0.5rem", borderBottom: "1px solid #ddd" };
+// Estilos de tabla
+const th: React.CSSProperties = { textAlign: "left", padding: "0.5rem", borderBottom: "1px solid #ddd", fontWeight: "600" };
 const td: React.CSSProperties = { padding: "0.5rem", borderBottom: "1px solid #eee" };
+
+// Estilos de formulario
+const labelStyle: React.CSSProperties = {
+  display: "grid",
+  gridTemplateColumns: "auto 1fr",
+  gap: "0.5rem",
+  alignItems: "flex-start",
+  fontSize: "0.9rem",
+  fontWeight: "500",
+  color: "#333",
+};
+
+const getInputStyle = (hasError: boolean): React.CSSProperties => ({
+  width: "100%",
+  padding: "0.6rem 0.75rem",
+  fontSize: "0.95rem",
+  border: `2px solid ${hasError ? "#e53e3e" : "#d0d0d0"}`,
+  borderRadius: "4px",
+  fontFamily: "inherit",
+  transition: "border-color 0.2s ease, box-shadow 0.2s ease",
+  backgroundColor: hasError ? "rgba(229, 62, 62, 0.05)" : "#fff",
+  boxShadow: hasError ? "0 0 0 3px rgba(229, 62, 62, 0.1)" : "none",
+});
+
+const getSelectStyle = (hasError: boolean): React.CSSProperties => ({
+  ...getInputStyle(hasError),
+  cursor: "pointer",
+  appearance: "none",
+  paddingRight: "2rem",
+  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23333' d='M6 9L1 4h10z'/%3E%3C/svg%3E")`,
+  backgroundRepeat: "no-repeat",
+  backgroundPosition: "right 0.75rem center",
+});
+
+const errorStyle: React.CSSProperties = {
+  color: "#e53e3e",
+  fontSize: "0.8rem",
+  marginTop: "0.25rem",
+  fontWeight: "500",
+};
+
+const helperStyle: React.CSSProperties = {
+  color: "#666",
+  fontSize: "0.8rem",
+  marginTop: "0.25rem",
+};
+
