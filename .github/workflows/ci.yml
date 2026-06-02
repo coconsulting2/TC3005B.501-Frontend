@@ -70,6 +70,37 @@ jobs:
           if-no-files-found: ignore
           retention-days: 7
 
+  test:
+    name: Unit tests (vitest + coverage)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        env:
+          CYPRESS_INSTALL_BINARY: '0'
+        run: bun install --frozen-lockfile
+
+      # vitest.config.ts enforces a 70% coverage threshold, so this step also
+      # gates coverage: it fails (non-zero exit) if coverage drops below 70%.
+      - name: Run vitest with coverage
+        run: bun run test:coverage
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: frontend-coverage
+          path: coverage/
+          if-no-files-found: ignore
+          retention-days: 30
+
   audit:
     name: Dependency audit
     runs-on: ubuntu-latest
