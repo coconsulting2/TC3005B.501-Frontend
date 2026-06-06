@@ -36,13 +36,28 @@ This project uses [Bun](https://bun.com/) as its package manager and script runn
 bun install
 ```
 
+### Environment variables
+
+Copy the example file and fill in the values for your setup:
+
+```sh
+cp .env.example .env
+```
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `PUBLIC_API_BASE_URL` | ✅ | Base URL of the Backend API (e.g. `https://localhost:3000/api`). Inlined into the build by Astro, so it must be set **before** building. |
+| `PUBLIC_IS_DEV` | ✅ | `true` for local development (relaxes TLS for the self-signed backend cert). |
+| `CYPRESS_*_USER` / `CYPRESS_*_PASSWORD` | E2E only | Seeded credentials per role (Solicitante, N1, N2, AV, CPP, Admin) used by the Cypress E2E suite. Only needed to run E2E tests. |
+| `CYPRESS_API_BASE` | Optional | Overrides the API URL used by E2E specs. Defaults to `https://localhost:3000/api`. |
+
 ### Running
 
 ```sh
 bun run dev
 ```
 
-A browser window should open automatically with the login page (HTTPS via the `@vitejs/plugin-basic-ssl` self-signed cert — accept the warning on first visit).
+A browser window should open automatically with the login page (HTTPS via the `@vitejs/plugin-basic-ssl` self-signed cert — accept the warning on first visit). Log in at `/login` with a user seeded by the Backend (see the Backend repo's seeding step). The session (token, role and permissions) is stored in cookies and resolved server-side on every SSR request.
 
 ---
 
@@ -87,24 +102,33 @@ docker run --rm -p 4321:4321 cocoschemefrontend:custom
 
 For production builds with a different `PUBLIC_API_BASE_URL`, trigger the `Docker Publish` workflow manually from the Actions tab and supply the `api_base_url` input.
 
-### Configuring
+### Testing
 
-The current version lacks any sort of connection to any sort of backend, as well as any sort of login interface. Therefore, the way to access different dashboards for different roles, is to manually edit the [/src/data/cookies.ts](/src/data/cookies.ts) file to choose the role whose dashboard you want to visualize.
+The project ships two test layers:
 
-Filename: /src/data/cookies.ts
-```typescript
-import type { UserRole } from "@type/roles";
+| Layer | Tool | Command |
+|-------|------|---------|
+| Unit / component | [Vitest](https://vitest.dev/) + Testing Library (jsdom) | `bun run test` |
+| Unit + coverage | Vitest (v8 coverage) | `bun run test:coverage` |
+| End-to-end | [Cypress](https://www.cypress.io/) | `bunx cypress run` (headless) / `bunx cypress open` (UI) |
+| Type checking | `astro check` | `bun run typecheck` |
 
-const mockCookies = {
-    username: "John Doe",
-    // CHANGE THIS
-    role: "Authorizer" as UserRole //'Applicant' | 'Authorizer' | 'Admin' | 'AccountsPayable' | 'TravelAgency';
-};
+> [!NOTE]
+> The Cypress E2E suite drives the real UI, so it needs **both** the Backend (`https://localhost:3000`) and the Frontend dev server (`https://localhost:4321`) running, plus the `CYPRESS_*` credentials from `.env`.
 
-export const getCookie = (key: keyof typeof mockCookies): string | UserRole => {
-    return mockCookies[key];
-};
-```
+### Scripts
+
+| Script | Description |
+|--------|-------------|
+| `bun run dev` | Start the Astro dev server (HTTPS, hot-reload). |
+| `bun run build` | Production build (`astro build`). |
+| `bun run preview` | Serve the production build locally. |
+| `bun run start` | Run the built SSR server (`dist/server/entry.mjs`). |
+| `bun run typecheck` | Type-check the project with `astro check`. |
+| `bun run test` | Run the Vitest unit/component suite once. |
+| `bun run test:watch` | Run Vitest in watch mode. |
+| `bun run test:coverage` | Run Vitest with a coverage report. |
+| `bun run docker:dev*` | Docker dev workflows (see the Docker section above). |
 
 ### Development Stack
 
