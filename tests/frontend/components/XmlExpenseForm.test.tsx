@@ -246,7 +246,7 @@ describe("XmlExpenseForm", () => {
 
     // Clear the monto field (default is 0 which fails positive())
     const montoInput = screen.getByRole("spinbutton");
-    await user.triple_click?.(montoInput);
+    await user.tripleClick(montoInput);
     await user.clear(montoInput);
 
     await user.click(
