@@ -14,6 +14,8 @@ import {
   setImpersonatedOrgId,
   getImpersonatedOrgId,
 } from "@stores/organizationStore";
+import { getCachedPermissions } from "@stores/permissionStore";
+import { hasPermission } from "@utils/permissions";
 import type {
   Organization,
   OrganizationListResponse,
@@ -56,6 +58,18 @@ export default function OrganizationsAdmin(_: Props) {
   const [statusFilter, setStatusFilter] = useState<"" | "CONFIGURING" | "ACTIVE" | "SUSPENDED">("");
   const [showWizard, setShowWizard] = useState(false);
   const [impersonatedId, setImpersonatedId] = useState<string | null>(getImpersonatedOrgId());
+  const [canCreateOrganization, setCanCreateOrganization] = useState(false);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const perms = await getCachedPermissions();
+        setCanCreateOrganization(hasPermission(perms, "organization:create"));
+      } catch {
+        setCanCreateOrganization(false);
+      }
+    })();
+  }, []);
 
   const loadOrgs = async () => {
     setLoading(true);
@@ -156,21 +170,23 @@ export default function OrganizationsAdmin(_: Props) {
             </select>
           </label>
         </div>
-        <button
-          onClick={() => setShowWizard(true)}
-          style={{
-            background: T.primary,
-            color: "#fff",
-            border: "none",
-            borderRadius: 8,
-            padding: "8px 16px",
-            fontSize: 14,
-            fontWeight: 600,
-            cursor: "pointer",
-          }}
-        >
-          + Nueva organización
-        </button>
+        {canCreateOrganization ? (
+          <button
+            onClick={() => setShowWizard(true)}
+            style={{
+              background: T.primary,
+              color: "#fff",
+              border: "none",
+              borderRadius: 8,
+              padding: "8px 16px",
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: "pointer",
+            }}
+          >
+            + Nueva organización
+          </button>
+        ) : null}
       </header>
 
       {impersonatedId && (

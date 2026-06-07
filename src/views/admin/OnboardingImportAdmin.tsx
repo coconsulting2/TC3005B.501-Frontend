@@ -23,6 +23,8 @@ import {
   IMPERSONATED_ORG_CHANGE_EVENT,
   IMPERSONATED_ORG_ID_STORAGE_KEY,
 } from "@stores/organizationStore";
+import { getCachedPermissions } from "@stores/permissionStore";
+import { hasPermission } from "@utils/permissions";
 
 /** Misma regla que el backend (importación). */
 const ONBOARDING_PASSWORD_RE = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
@@ -97,6 +99,25 @@ export default function OnboardingImportAdmin({ orgId }: Props) {
 
   /** Snapshot reactivo de impersonación (localStorage + evento al cambiar en la misma pestaña). */
   const [impersonatedOrgId, setImpersonatedOrgSnapshot] = useState<string | null>(null);
+  /** Solo super-admin Ditta (`organization:create`); org admin importa usuarios en su tenant. */
+  const [canCreateOrganization, setCanCreateOrganization] = useState(false);
+
+  useEffect(() => {
+    void (async () => {
+      try {
+        const perms = await getCachedPermissions();
+        setCanCreateOrganization(hasPermission(perms, "organization:create"));
+      } catch {
+        setCanCreateOrganization(false);
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (!canCreateOrganization && createNewOrgOption) {
+      setCreateNewOrgOption(false);
+    }
+  }, [canCreateOrganization, createNewOrgOption]);
 
   useEffect(() => {
     const sync = () => {
@@ -338,59 +359,61 @@ export default function OnboardingImportAdmin({ orgId }: Props) {
       {/* ── Zona de drop ── */}
       {(phase === "idle" || phase === "error") && (
         <>
-          <div
-            style={{
-              marginBottom: 16,
-              padding: "16px 18px",
-              borderRadius: 10,
-              border: `1px solid ${T.borderSoft}`,
-              background: T.surfaceMuted,
-              fontSize: 16,
-              lineHeight: 1.45,
-              color: T.ink,
-            }}
-          >
-            <label
+          {canCreateOrganization ? (
+            <div
               style={{
-                display: "flex",
-                gap: 14,
-                alignItems: "flex-start",
-                cursor: impersonatedOrgId ? "not-allowed" : "pointer",
+                marginBottom: 16,
+                padding: "16px 18px",
+                borderRadius: 10,
+                border: `1px solid ${T.borderSoft}`,
+                background: T.surfaceMuted,
+                fontSize: 16,
+                lineHeight: 1.45,
+                color: T.ink,
               }}
             >
-              <input
-                type="checkbox"
-                checked={createNewOrgOption}
-                disabled={Boolean(impersonatedOrgId)}
-                onChange={(e) => setCreateNewOrgOption(e.target.checked)}
+              <label
                 style={{
-                  marginTop: 4,
-                  width: 24,
-                  height: 24,
-                  minWidth: 24,
-                  minHeight: 24,
-                  flexShrink: 0,
+                  display: "flex",
+                  gap: 14,
+                  alignItems: "flex-start",
                   cursor: impersonatedOrgId ? "not-allowed" : "pointer",
-                  accentColor: T.primary,
                 }}
-              />
-              <span style={{ fontSize: 16, color: T.ink }}>
-                <strong style={{ fontSize: 18, display: "block", marginBottom: 6 }}>
-                  Crear organización nueva
-                </strong>
-                Al importar (solo JSON con bloque{" "}
-                <code style={{ fontSize: 14, padding: "2px 6px", background: T.surfaceTertiary, borderRadius: 4 }}>
-                  organization
-                </code>{" "}
-                + usuarios). Requiere permiso de crear organizaciones.
-                {impersonatedOrgId ? (
-                  <span style={{ display: "block", marginTop: 8, fontSize: 15, color: T.inkSecondary }}>
-                    Sal de la <strong>impersonación</strong> de otra org antes de marcar esta opción.
-                  </span>
-                ) : null}
-              </span>
-            </label>
-          </div>
+              >
+                <input
+                  type="checkbox"
+                  checked={createNewOrgOption}
+                  disabled={Boolean(impersonatedOrgId)}
+                  onChange={(e) => setCreateNewOrgOption(e.target.checked)}
+                  style={{
+                    marginTop: 4,
+                    width: 24,
+                    height: 24,
+                    minWidth: 24,
+                    minHeight: 24,
+                    flexShrink: 0,
+                    cursor: impersonatedOrgId ? "not-allowed" : "pointer",
+                    accentColor: T.primary,
+                  }}
+                />
+                <span style={{ fontSize: 16, color: T.ink }}>
+                  <strong style={{ fontSize: 18, display: "block", marginBottom: 6 }}>
+                    Crear organización nueva
+                  </strong>
+                  Al importar (solo JSON con bloque{" "}
+                  <code style={{ fontSize: 14, padding: "2px 6px", background: T.surfaceTertiary, borderRadius: 4 }}>
+                    organization
+                  </code>{" "}
+                  + usuarios). Requiere permiso de crear organizaciones.
+                  {impersonatedOrgId ? (
+                    <span style={{ display: "block", marginTop: 8, fontSize: 15, color: T.inkSecondary }}>
+                      Sal de la <strong>impersonación</strong> de otra org antes de marcar esta opción.
+                    </span>
+                  ) : null}
+                </span>
+              </label>
+            </div>
+          ) : null}
         <div
           onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
           onDragLeave={() => setDragging(false)}

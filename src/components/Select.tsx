@@ -25,6 +25,7 @@ interface SelectProps {
   disabled?: boolean;
   searchable?: boolean;
   onChange?: (value: string) => void;
+  className?: string;
 }
 
 export default function Select({
@@ -39,6 +40,7 @@ export default function Select({
   disabled = false,
   searchable = false,
   onChange,
+  className = "",
 }: SelectProps) {
   const [isOpen, setIsOpen] = useState(false);
   const [search, setSearch] = useState("");
@@ -117,7 +119,7 @@ export default function Select({
   }, []);
 
   const triggerClasses = [
-    "flex items-center justify-between w-full px-3 py-2.5 border rounded-[var(--radius-md)] text-sm",
+    "flex items-center justify-between gap-2 w-full min-w-0 px-3 py-2.5 border rounded-[var(--radius-md)] text-sm",
     "bg-[var(--color-surface-white)] text-[var(--color-ink)]",
     "focus:outline-none focus:ring-2 focus:ring-primary-200 focus:border-primary-400",
     "transition-colors duration-200",
@@ -126,7 +128,11 @@ export default function Select({
   ].join(" ");
 
   return (
-    <div className="mb-4 w-full relative" ref={containerRef} onKeyDown={handleKeyDown}>
+    <div
+      className={`mb-4 w-full min-w-0 relative ${className}`.trim()}
+      ref={containerRef}
+      onKeyDown={handleKeyDown}
+    >
       {label && (
         <label htmlFor={name} className="block text-sm font-medium mb-1.5 text-[var(--color-ink-secondary)]">
           {label} {required && <span className="text-accent-400">*</span>}
@@ -146,11 +152,16 @@ export default function Select({
         aria-invalid={!!error}
         aria-describedby={error ? `${name}-error` : helperText ? `${name}-helper` : undefined}
       >
-        <span className={selectedOption ? "text-[var(--color-ink)]" : "text-[var(--color-ink-subtle)]"}>
+        <span
+          className={[
+            "flex-1 min-w-0 truncate text-left",
+            selectedOption ? "text-[var(--color-ink)]" : "text-[var(--color-ink-subtle)]",
+          ].join(" ")}
+        >
           {selectedOption ? selectedOption.label : placeholder}
         </span>
         <svg
-          className={`w-4 h-4 text-[var(--color-ink-muted)] transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
+          className={`w-4 h-4 shrink-0 text-[var(--color-ink-muted)] transition-transform duration-200 ${isOpen ? "rotate-180" : ""}`}
           fill="none"
           stroke="currentColor"
           viewBox="0 0 24 24"
@@ -186,7 +197,7 @@ export default function Select({
                   role="option"
                   aria-selected={opt.value === value}
                   className={[
-                    "px-3 py-2 text-sm cursor-pointer transition-colors",
+                    "px-3 py-2 text-sm cursor-pointer transition-colors whitespace-nowrap",
                     opt.value === value ? "bg-primary-50 text-primary-500 font-medium" : "",
                     idx === highlightIndex ? "bg-[var(--color-surface-secondary)]" : "",
                     opt.value !== value && idx !== highlightIndex ? "hover:bg-[var(--color-surface-secondary)]" : "",

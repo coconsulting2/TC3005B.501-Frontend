@@ -2,16 +2,20 @@
  * WorkflowRulesAdmin — CRUD panel for workflow rules per organization.
  * Visible only for the org Administrador role (workflow:manage permission).
  */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState, useId, cloneElement, isValidElement } from "react";
 import { apiRequest } from "@utils/apiClient";
 import InfoTooltip from "@components/InfoTooltip";
 import WorkflowRulePreviewPanel, {
   GUIDE_SAMPLE_AMOUNTS,
+  type CountryOption,
+  type ReceiptTypeOption,
 } from "@components/WorkflowRulePreviewPanel";
 import { previewWorkflowRules } from "@utils/workflowRulePreview";
 import {
   WORKFLOW_RULE_FIELD_HELP,
+  WORKFLOW_CURRENCY_OPTIONS,
   getParamValueHelp,
+  getParamValueLabel,
 } from "@config/workflowRuleFieldHelp";
 import {
   isFieldVisible,
@@ -128,6 +132,8 @@ export default function WorkflowRulesAdmin({ token }: Props) {
   const [rules, setRules] = useState<WorkflowRuleDTO[]>([]);
   const [departments, setDepartments] = useState<DepartmentOption[]>([]);
   const [roles, setRoles] = useState<string[]>([]);
+  const [countries, setCountries] = useState<CountryOption[]>([]);
+  const [receiptTypes, setReceiptTypes] = useState<ReceiptTypeOption[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filterDept, setFilterDept] = useState<string>("all");
@@ -184,11 +190,33 @@ export default function WorkflowRulesAdmin({ token }: Props) {
     }
   }, [headers]);
 
+  const fetchCountries = useCallback(async () => {
+    try {
+      const data = await apiRequest<CountryOption[]>("/workflow-rules/countries", { headers });
+      setCountries(data);
+    } catch {
+      setCountries([]);
+    }
+  }, [headers]);
+
+  const fetchReceiptTypes = useCallback(async () => {
+    try {
+      const data = await apiRequest<ReceiptTypeOption[]>("/workflow-rules/receipt-types", {
+        headers,
+      });
+      setReceiptTypes(data);
+    } catch {
+      setReceiptTypes([]);
+    }
+  }, [headers]);
+
   useEffect(() => {
     fetchRules();
     fetchDepartments();
     fetchRoles();
-  }, [fetchRules, fetchDepartments, fetchRoles]);
+    fetchCountries();
+    fetchReceiptTypes();
+  }, [fetchRules, fetchDepartments, fetchRoles, fetchCountries, fetchReceiptTypes]);
 
   const loadGuideSamples = useCallback(async () => {
     try {
@@ -400,6 +428,8 @@ export default function WorkflowRulesAdmin({ token }: Props) {
             headers={headers}
             departmentId={pageDepartmentId}
             defaultAmount={15000}
+            countries={countries}
+            receiptTypes={receiptTypes}
           />
         </div>
       ) : null}
@@ -672,7 +702,7 @@ export default function WorkflowRulesAdmin({ token }: Props) {
               ) : null}
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
-                <FieldLabel label="Tipo de regla" tooltip={WORKFLOW_RULE_FIELD_HELP.ruleType}>
+                <FieldLabel label="Tipo de regla" tooltip={WORKFLOW_RULE_FIELD_HELP.ruleType} tooltipAlign="start">
                   <select
                     value={form.ruleType}
                     onChange={(e) => updateForm("ruleType", e.target.value as WfRuleType)}
@@ -702,7 +732,7 @@ export default function WorkflowRulesAdmin({ token }: Props) {
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 14 }}>
                 <CollapsibleField visible={show("threshold")}>
-                  <FieldLabel label="Umbral ($)" tooltip={WORKFLOW_RULE_FIELD_HELP.threshold}>
+                  <FieldLabel label="Umbral ($)" tooltip={WORKFLOW_RULE_FIELD_HELP.threshold} tooltipAlign="start">
                     <input
                       type="number"
                       min={0}
@@ -718,21 +748,15 @@ export default function WorkflowRulesAdmin({ token }: Props) {
                 </CollapsibleField>
                 <CollapsibleField visible={show("paramValue")}>
                   <FieldLabel
-                    label="Valor del parámetro"
+                    label={getParamValueLabel(form.paramType)}
                     tooltip={getParamValueHelp(form.paramType)}
                   >
-                    <input
-                      type="text"
-                      value={form.paramValue ?? ""}
-                      onChange={(e) => updateForm("paramValue", e.target.value || null)}
-                      style={inputStyle}
-                      placeholder={
-                        form.paramType === "moneda"
-                          ? "ej. USD"
-                          : form.paramType === "destino"
-                            ? "ID país"
-                            : "ej. valor"
-                      }
+                    <ParamValueInput
+                      paramType={form.paramType}
+                      value={form.paramValue}
+                      onChange={(v) => updateForm("paramValue", v)}
+                      countries={countries}
+                      receiptTypes={receiptTypes}
                     />
                   </FieldLabel>
                 </CollapsibleField>
@@ -755,6 +779,7 @@ export default function WorkflowRulesAdmin({ token }: Props) {
                 <FieldLabel
                   label="Pasos de jefe"
                   tooltip={WORKFLOW_RULE_FIELD_HELP.managerSteps}
+                  tooltipAlign="start"
                 >
                   <input
                     type="number"
@@ -785,7 +810,7 @@ export default function WorkflowRulesAdmin({ token }: Props) {
               </div>
 
               <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 14 }}>
-                <FieldLabel label="Departamento" tooltip={WORKFLOW_RULE_FIELD_HELP.department}>
+                <FieldLabel label="Departamento" tooltip={WORKFLOW_RULE_FIELD_HELP.department} tooltipAlign="start">
                   <select
                     value={form.departmentId ?? ""}
                     onChange={(e) =>
@@ -806,6 +831,7 @@ export default function WorkflowRulesAdmin({ token }: Props) {
                   <FieldLabel
                     label="Skip si menor a ($)"
                     tooltip={WORKFLOW_RULE_FIELD_HELP.skipIfBelow}
+                    tooltipAlign="start"
                   >
                     <input
                       type="number"
@@ -840,6 +866,8 @@ export default function WorkflowRulesAdmin({ token }: Props) {
                 editingRuleId={editingId}
                 refreshKey={formKey}
                 defaultAmount={10000}
+                countries={countries}
+                receiptTypes={receiptTypes}
               />
             </div>
 
@@ -893,18 +921,101 @@ export default function WorkflowRulesAdmin({ token }: Props) {
   );
 }
 
+function ParamValueInput({
+  paramType,
+  value,
+  onChange,
+  countries,
+  receiptTypes,
+}: {
+  paramType: WfParamType;
+  value: string | null;
+  onChange: (v: string | null) => void;
+  countries: CountryOption[];
+  receiptTypes: ReceiptTypeOption[];
+}) {
+  switch (paramType) {
+    case "destino":
+      return (
+        <select
+          value={value ?? ""}
+          onChange={(e) => onChange(e.target.value || null)}
+          style={selectStyle}
+        >
+          <option value="">— Selecciona un país —</option>
+          {countries.map((c) => (
+            <option key={c.countryId} value={String(c.countryId)}>
+              {c.countryName}
+            </option>
+          ))}
+        </select>
+      );
+    case "gasto":
+      return (
+        <select
+          value={value ?? ""}
+          onChange={(e) => onChange(e.target.value || null)}
+          style={selectStyle}
+        >
+          <option value="">— Selecciona tipo de gasto —</option>
+          {receiptTypes.map((rt) => (
+            <option key={rt.receiptTypeId} value={String(rt.receiptTypeId)}>
+              {rt.receiptTypeName}
+            </option>
+          ))}
+        </select>
+      );
+    case "moneda":
+      return (
+        <select
+          value={value ?? ""}
+          onChange={(e) => onChange(e.target.value || null)}
+          style={selectStyle}
+        >
+          <option value="">— Selecciona moneda —</option>
+          {WORKFLOW_CURRENCY_OPTIONS.map((code) => (
+            <option key={code} value={code}>
+              {code}
+            </option>
+          ))}
+        </select>
+      );
+    case "nivel":
+      return (
+        <input
+          type="number"
+          min={1}
+          max={10}
+          value={value ?? ""}
+          onChange={(e) => onChange(e.target.value || null)}
+          style={inputStyle}
+          placeholder="ej. 2"
+        />
+      );
+    default:
+      return null;
+  }
+}
+
 function FieldLabel({
   label,
   tooltip,
+  tooltipAlign = "center",
   children,
 }: {
   label: string;
   tooltip?: string;
+  tooltipAlign?: "start" | "center" | "end";
   children: React.ReactNode;
 }) {
+  const fieldId = useId();
+  const control = isValidElement(children)
+    ? cloneElement(children as React.ReactElement<{ id?: string }>, { id: fieldId })
+    : children;
+
   return (
-    <label style={{ display: "block" }}>
-      <span
+    <div style={{ display: "block" }}>
+      <div
         style={{
           display: "flex",
           alignItems: "center",
@@ -914,11 +1025,15 @@ function FieldLabel({
           marginBottom: 4,
         }}
       >
-        {label}
-        {tooltip ? <InfoTooltip text={tooltip} label={`Ayuda: ${label}`} /> : null}
-      </span>
-      {children}
-    </label>
+        <label htmlFor={fieldId} style={{ display: "inline-flex", alignItems: "center", cursor: "default" }}>
+          {label}
+        </label>
+        {tooltip ? (
+          <InfoTooltip text={tooltip} label={`Ayuda: ${label}`} align={tooltipAlign} />
+        ) : null}
+      </div>
+      {control}
+    </div>
   );
 }
 

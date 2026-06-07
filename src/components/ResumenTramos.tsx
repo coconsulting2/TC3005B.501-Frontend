@@ -24,7 +24,7 @@ const API_BASE_URL = import.meta.env.PUBLIC_API_BASE_URL;
 /* ── Types matching real backend response ── */
 
 interface Comprobante {
-  gasto_tramo_id: number;
+  gasto_tramo_id: number | null;
   receipt_id: number;
   receipt_type: string;
   amount: number;
@@ -33,16 +33,17 @@ interface Comprobante {
 }
 
 interface Tramo {
-  tramo_id: number;
-  router_index: number;
-  origin_country: string;
+  tramo_id: number | null;
+  router_index: number | null;
+  origin_country: string | null;
   origin_city: string;
-  destination_country: string;
+  destination_country: string | null;
   destination_city: string;
-  beginning_date: string;
-  ending_date: string;
+  beginning_date: string | null;
+  ending_date: string | null;
   comprobantes: Comprobante[];
   total_tramo: number;
+  unassigned?: boolean;
 }
 
 interface ResumenTramosResponse {
@@ -79,13 +80,30 @@ const validationLabels: Record<string, string> = {
   approved: "Aprobado",
   pending: "Pendiente",
   rejected: "Rechazado",
+  Aprobado: "Aprobado",
+  Pendiente: "Pendiente",
+  Rechazado: "Rechazado",
 };
 
 const validationPill: Record<string, string> = {
   approved: "bg-success-50 text-success-500",
   pending: "bg-warning-50 text-warning-500",
   rejected: "bg-accent-50 text-accent-400",
+  Aprobado: "bg-success-50 text-success-500",
+  Pendiente: "bg-warning-50 text-warning-500",
+  Rechazado: "bg-accent-50 text-accent-400",
 };
+
+function tramoRowKey(tramo: Tramo, index: number): number | string {
+  return tramo.tramo_id ?? `unassigned-${index}`;
+}
+
+function tramoLabel(tramo: Tramo): string {
+  if (tramo.unassigned) {
+    return "Comprobantes sin tramo asignado";
+  }
+  return `${tramo.origin_city} → ${tramo.destination_city}`;
+}
 
 /* ── Component ── */
 
@@ -93,7 +111,7 @@ export default function ResumenTramos({ requestId, token }: ResumenTramosProps) 
   const [data, setData] = useState<ResumenTramosResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [expandedTramos, setExpandedTramos] = useState<Set<number>>(new Set());
+  const [expandedTramos, setExpandedTramos] = useState<Set<number | string>>(new Set());
 
   useEffect(() => {
     const fetchResumen = async () => {
@@ -118,10 +136,10 @@ export default function ResumenTramos({ requestId, token }: ResumenTramosProps) 
     fetchResumen();
   }, [requestId, token]);
 
-  const toggleTramo = (tramoId: number) => {
+  const toggleTramo = (key: number | string) => {
     setExpandedTramos((prev) => {
       const next = new Set(prev);
-      next.has(tramoId) ? next.delete(tramoId) : next.add(tramoId);
+      next.has(key) ? next.delete(key) : next.add(key);
       return next;
     });
   };
@@ -186,14 +204,15 @@ export default function ResumenTramos({ requestId, token }: ResumenTramosProps) 
           </thead>
 
           <tbody>
-            {data.tramos.map((tramo) => {
-              const isExpanded = expandedTramos.has(tramo.tramo_id);
+            {data.tramos.map((tramo, index) => {
+              const rowKey = tramoRowKey(tramo, index);
+              const isExpanded = expandedTramos.has(rowKey);
               return (
                 <TramoRow
-                  key={tramo.tramo_id}
+                  key={String(rowKey)}
                   tramo={tramo}
                   isExpanded={isExpanded}
-                  onToggle={() => toggleTramo(tramo.tramo_id)}
+                  onToggle={() => toggleTramo(rowKey)}
                 />
               );
             })}
@@ -250,15 +269,19 @@ function TramoRow({
         </td>
         <td className="px-4 py-3">
           <span className="text-sm font-medium text-[var(--color-ink)]">
-            {tramo.origin_city} → {tramo.destination_city}
+            {tramoLabel(tramo)}
           </span>
-          <span className="text-xs text-[var(--color-ink-muted)] block sm:hidden">
-            {formatDate(tramo.beginning_date)} – {formatDate(tramo.ending_date)}
-          </span>
+          {!tramo.unassigned && (
+            <span className="text-xs text-[var(--color-ink-muted)] block sm:hidden">
+              {formatDate(tramo.beginning_date ?? "")} – {formatDate(tramo.ending_date ?? "")}
+            </span>
+          )}
         </td>
         <td className="px-4 py-3 hidden sm:table-cell">
           <span className="text-sm text-[var(--color-ink-muted)]">
-            {formatDate(tramo.beginning_date)} – {formatDate(tramo.ending_date)}
+            {tramo.unassigned
+              ? "—"
+              : `${formatDate(tramo.beginning_date ?? "")} – ${formatDate(tramo.ending_date ?? "")}`}
           </span>
         </td>
         <td className="px-4 py-3 text-right">
@@ -290,7 +313,7 @@ function TramoRow({
                 </thead>
                 <tbody>
                   {tramo.comprobantes.map((comp) => (
-                    <tr key={comp.gasto_tramo_id} className="border-t border-[var(--color-neutral-200)]/50">
+                    <tr key={comp.gasto_tramo_id ?? comp.receipt_id} className="border-t border-[var(--color-neutral-200)]/50">
                       <td className="px-6 py-2 text-sm text-[var(--color-ink-muted)] tabular-nums">
                         #{comp.receipt_id}
                       </td>
@@ -330,6 +353,11 @@ function TramoRow({
             className="px-6 py-4 text-sm text-[var(--color-ink-muted)] bg-[var(--color-surface-secondary)] border-b border-[var(--color-neutral-200)]"
           >
             Sin comprobantes asociados a este tramo.
+            {tramo.unassigned && (
+              <span className="block mt-1">
+                Sube comprobantes desde Subir comprobante y elige el tramo en viajes multidestino.
+              </span>
+            )}
           </td>
         </tr>
       )}

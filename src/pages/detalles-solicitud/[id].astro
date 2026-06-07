@@ -38,6 +38,7 @@ const isCxP = role === "Cuentas por pagar";
 const statusId = Number(request.request_status_id);
 const showExpenseValidation = isCxP && (statusId === 7 || statusId === 8);
 const canValidateReceipts = isCxP && statusId === 7;
+const showResumenTramos = statusId >= 6;
 const backHref = isCxP ? "/todas-las-solicitudes" : "/dashboard";
 
 const showUploadCTA =
@@ -52,6 +53,7 @@ const showUploadCTA =
     authToken={token as string}
     backHref={backHref}
     showUploadCTA={showUploadCTA}
+    showResumenTramos={showResumenTramos}
   >
     {showExpenseValidation && (
       <RequestExpensesValidationSection

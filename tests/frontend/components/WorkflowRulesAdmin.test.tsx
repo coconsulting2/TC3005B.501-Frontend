@@ -31,18 +31,45 @@ function setupHandlers() {
     http.get(`${API}/workflow-rules/roles`, () =>
       HttpResponse.json(["N1", "N2", "Administrador"]),
     ),
+    http.get(`${API}/workflow-rules/countries`, () =>
+      HttpResponse.json([
+        { countryId: 1, countryName: "México" },
+        { countryId: 2, countryName: "Estados Unidos" },
+      ]),
+    ),
+    http.get(`${API}/workflow-rules/receipt-types`, () =>
+      HttpResponse.json([
+        { receiptTypeId: 1, receiptTypeName: "Hospedaje" },
+        { receiptTypeId: 2, receiptTypeName: "Comida" },
+      ]),
+    ),
     http.post(`${API}/workflow-rules/preview`, async ({ request }) => {
-      const body = (await request.json()) as { amount: number };
+      const body = (await request.json()) as {
+        amount: number;
+        draftRule?: { paramType?: string };
+      };
       const levels = body.amount < 50000 ? [2] : [1, 2];
+      const summary =
+        body.draftRule?.paramType === "destino"
+          ? "Al activarse, la solicitud pasa por N1 e inicia en Primera Revisión (N1)."
+          : body.draftRule?.paramType === "nivel"
+            ? "Al activarse, la solicitud pasa por N1 e inicia en Primera Revisión (N1)."
+            : `Resumen para ${body.amount}`;
+      const hints =
+        body.draftRule?.paramType === "destino" || body.draftRule?.paramType === "nivel"
+          ? ["Condición cumplida → se exige al menos nivel N1."]
+          : [];
       return HttpResponse.json({
-        levels,
+        levels: body.draftRule?.paramType === "importe" || !body.draftRule?.paramType
+          ? levels
+          : [1],
         minApprovalLevel: levels[0],
         maxApprovalLevel: levels[levels.length - 1],
         skipApplied: body.amount < 50000,
         initialStatusId: levels[0] === 2 ? 3 : 2,
         initialStatusLabel: levels[0] === 2 ? "Segunda Revisión (N2)" : "Primera Revisión (N1)",
-        summary: `Resumen para ${body.amount}`,
-        hints: [],
+        summary,
+        hints,
         amountEvaluated: body.amount,
         currencyEvaluated: "MXN",
       });
@@ -72,13 +99,30 @@ describe("WorkflowRulesAdmin", () => {
     const modal = dialog.closest("div")?.parentElement?.parentElement;
     expect(modal).toBeTruthy();
 
-    const param = screen.getByLabelText(/parámetro/i) as HTMLSelectElement;
+    const param = screen.getByLabelText(/^parámetro$/i);
     await user.selectOptions(param, "destino");
 
     await waitFor(() => {
       expect(screen.queryByLabelText(/skip si menor a/i)).not.toBeInTheDocument();
     });
-    expect(screen.getByLabelText(/valor del parámetro/i)).toBeInTheDocument();
+    expect(screen.getByLabelText(/^país de destino$/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/monto base/i)).not.toBeInTheDocument();
+  });
+
+  it("muestra preview por destino al cambiar parámetro", async () => {
+    const user = userEvent.setup();
+    render(<WorkflowRulesAdmin />);
+    await screen.findByText("$50,000");
+    await user.click(screen.getByRole("button", { name: /nueva regla/i }));
+
+    await user.selectOptions(screen.getByLabelText(/^parámetro$/i), "destino");
+    const countrySelects = await screen.findAllByLabelText(/^país de destino$/i);
+    await user.selectOptions(countrySelects[0], "1");
+
+    await waitFor(() => {
+      expect(screen.getByText(/al activarse/i)).toBeInTheDocument();
+    });
+    expect(screen.queryByText(/banda de importe/i)).not.toBeInTheDocument();
   });
 
   it("muestra vista previa en el modal al crear regla", async () => {

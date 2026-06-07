@@ -22,7 +22,7 @@ const userId = getCookie("id", Astro.cookies);
 
 import { apiRequest } from "@/utils/apiClient";
 import {
-  buildFlightSearchDefaults,
+  buildFlightSegmentsForQuote,
   buildHotelSearchDefaults,
   computeAgencyServiceFlags,
 } from "@/utils/travelRequestAgency";
@@ -39,7 +39,7 @@ try {
 
 const { needsPlane, needsHotel } = computeAgencyServiceFlags(request.routes);
 const hotelSearchDefaults = buildHotelSearchDefaults(request.routes);
-const flightSearchDefaults = buildFlightSearchDefaults(request.routes);
+const flightSegments = buildFlightSegmentsForQuote(request.routes);
 const needsAgencyQuotation = needsPlane || needsHotel;
 const isCancelled = Number(request.request_status_id) === 9;
 
@@ -95,7 +95,8 @@ const isCancelled = Number(request.request_status_id) === 9;
         needsPlane={needsPlane}
         needsHotel={needsHotel}
         hotelSearchDefaults={hotelSearchDefaults}
-        flightSearchDefaults={flightSearchDefaults}
+        flightSegments={flightSegments}
+        initialFlightOffer={request.selected_flight_offer}
       />
     </div>
   ) : !isCancelled ? (

@@ -14,6 +14,7 @@ import CommentsThread from '@components/comments/CommentsThread';
 import { getCookie } from "@data/cookies";
 import SolicitudTimeline from '@components/SolicitudTimeline';
 import Button from '@components/Button.astro';
+import ResumenTramos from '@components/ResumenTramos';
 
 const {
   request,
@@ -25,6 +26,7 @@ const {
   showTimeline = true,
   showComments = true,
   showUploadCTA,
+  showResumenTramos = false,
 } = Astro.props;
 
 const username = getCookie("username", Astro.cookies) ?? "";
@@ -102,6 +104,16 @@ const username = getCookie("username", Astro.cookies) ?? "";
       </div>
     </section>
     
+    {showResumenTramos && authToken && (
+      <section class="mt-12 pt-8 border-t-2 border-gray-200">
+        <ResumenTramos
+          client:only="react"
+          requestId={request.request_id}
+          token={authToken}
+        />
+      </section>
+    )}
+
     {request.notes && (
       <section>
         <h2 class="text-2xl font-bold text-gray-900 mb-5 border-b-2 border-black pb-2">

@@ -1,0 +1,60 @@
+---
+export const prerender = false;
+
+import MainLayout from "@layouts/MainLayout.astro";
+import EditorialHeader from "@components/EditorialHeader.astro";
+import ResumenTramos from "@components/ResumenTramos";
+import type { UserRole } from "@type/roles";
+import { getCookie } from "@data/cookies";
+import { roleLabels } from "@config/role-labels";
+
+const role: UserRole = getCookie("role", Astro.cookies) as UserRole;
+const userName = getCookie("username", Astro.cookies);
+const buttonLabel = roleLabels[role];
+const token = getCookie("token", Astro.cookies) ?? "";
+
+const { id } = Astro.params;
+const numericId = Number(id);
+if (!Number.isFinite(numericId) || numericId < 1) {
+  return Astro.redirect("/404");
+}
+
+const backHref = role === "Cuentas por pagar" ? "/resumen-tramos" : "/resumen-tramos";
+---
+
+<MainLayout title={`Resumen tramos #${numericId}`} data={{ userName, buttonLabel, role }}>
+  <main class="flex flex-col gap-6">
+    <EditorialHeader
+      eyebrow={`Coco / Gastos / Tramos / #${numericId}`}
+      title={`Resumen por tramos — solicitud #${numericId}`}
+      subtitle="Gastos y comprobantes agrupados por segmento del viaje"
+    >
+      <a
+        href={backHref}
+        class="text-sm font-medium text-primary-500 hover:text-primary-400 transition-colors whitespace-nowrap"
+      >
+        ← Volver al listado
+      </a>
+    </EditorialHeader>
+
+    <section class="card-editorial p-5 sm:p-8">
+      <ResumenTramos client:only="react" requestId={numericId} token={token} />
+    </section>
+
+    <div class="flex flex-wrap gap-3 text-sm">
+      <a href={`/detalles-solicitud/${numericId}`} class="text-primary-500 hover:text-primary-400">
+        Ver detalle de la solicitud →
+      </a>
+      {role !== "Cuentas por pagar" && (
+        <a href={`/comprobar-solicitud/${numericId}`} class="text-primary-500 hover:text-primary-400">
+          Ir a comprobantes →
+        </a>
+      )}
+      {role === "Cuentas por pagar" && (
+        <a href={`/comprobar-gastos/${numericId}`} class="text-primary-500 hover:text-primary-400">
+          Validar comprobantes →
+        </a>
+      )}
+    </div>
+  </main>
+</MainLayout>

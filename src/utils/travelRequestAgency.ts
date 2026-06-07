@@ -3,6 +3,7 @@
  */
 
 export type AgencyRouteLike = {
+  router_index?: number;
   plane_needed?: boolean;
   hotel_needed?: boolean;
   origin_city?: string;
@@ -19,6 +20,36 @@ export type FlightSearchDefaults = {
   fecha: string;
   fecha_regreso?: string;
   pasajeros: number;
+};
+
+/** Tramo con avión que la agencia debe cotizar (multidestino). */
+export type FlightSegmentQuote = {
+  routerIndex: number;
+  label: string;
+  defaults: FlightSearchDefaults;
+};
+
+/** Almacenamiento v2 de ofertas por tramo en Request.selectedFlightOffer. */
+export type StoredFlightOffersV2 = {
+  version: 2;
+  segments: Array<{
+    router_index: number;
+    label?: string;
+    offer: Record<string, unknown>;
+  }>;
+};
+
+export type NormalizedFlightOffer = {
+  id: string;
+  airlineName: string;
+  airlineIata: string;
+  departureAt: string;
+  arrivalAt: string;
+  durationLabel: string;
+  stops: number;
+  totalAmount: number;
+  totalCurrency: string;
+  rawOfferId?: string;
 };
 
 /** Mapa estático ciudad común (México) → IATA. Claves en minúsculas sin acentos. */
@@ -90,13 +121,17 @@ function isoDatePart(d: unknown): string {
 
 /**
  * Primer tramo con avión: origen/destino IATA y fechas ida (y regreso si aplica).
+ * @deprecated Preferir {@link buildFlightSegmentsForQuote} en viajes multidestino.
  */
 export function buildFlightSearchDefaults(
   routes: AgencyRouteLike[] | undefined,
 ): FlightSearchDefaults | null {
-  const list = Array.isArray(routes) ? routes : [];
-  const r = list.find((x) => Boolean(x.plane_needed));
-  if (!r) return null;
+  const segments = buildFlightSegmentsForQuote(routes);
+  return segments[0]?.defaults ?? null;
+}
+
+function buildDefaultsForRoute(r: AgencyRouteLike): FlightSearchDefaults | null {
+  if (!r.plane_needed) return null;
 
   let fecha = isoDatePart(r.beginning_date);
   if (!fecha) fecha = new Date().toISOString().slice(0, 10);
@@ -106,16 +141,70 @@ export function buildFlightSearchDefaults(
     fechaRegreso = undefined;
   }
 
-  const origen = cityNameToIata(r.origin_city);
-  const destino = cityNameToIata(r.destination_city);
-
   return {
-    origen,
-    destino,
+    origen: cityNameToIata(r.origin_city),
+    destino: cityNameToIata(r.destination_city),
     fecha,
     ...(fechaRegreso ? { fecha_regreso: fechaRegreso } : {}),
     pasajeros: 1,
   };
+}
+
+function formatSegmentLabel(r: AgencyRouteLike, routerIndex: number): string {
+  const from = [r.origin_city, r.origin_country].filter(Boolean).join(", ");
+  const to = [r.destination_city, r.destination_country].filter(Boolean).join(", ");
+  if (from && to) return `${from} → ${to}`;
+  return `Tramo ${routerIndex + 1}`;
+}
+
+/**
+ * Un bloque de cotización de vuelo por cada tramo con plane_needed (multidestino).
+ */
+export function buildFlightSegmentsForQuote(
+  routes: AgencyRouteLike[] | undefined,
+): FlightSegmentQuote[] {
+  const list = Array.isArray(routes) ? routes : [];
+  const segments: FlightSegmentQuote[] = [];
+
+  list.forEach((r, idx) => {
+    if (!r.plane_needed) return;
+    const defaults = buildDefaultsForRoute(r);
+    if (!defaults) return;
+    const routerIndex = r.router_index ?? idx;
+    segments.push({
+      routerIndex,
+      label: formatSegmentLabel(r, routerIndex),
+      defaults,
+    });
+  });
+
+  return segments.sort((a, b) => a.routerIndex - b.routerIndex);
+}
+
+/**
+ * Lee ofertas guardadas (formato legacy u objeto v2 con segments).
+ */
+export function parseStoredFlightOffers(
+  raw: unknown,
+): Record<number, Record<string, unknown>> {
+  if (!raw || typeof raw !== "object") return {};
+
+  const obj = raw as Record<string, unknown>;
+  if (obj.version === 2 && Array.isArray(obj.segments)) {
+    const map: Record<number, Record<string, unknown>> = {};
+    for (const item of obj.segments as StoredFlightOffersV2["segments"]) {
+      if (item?.router_index != null && item.offer && typeof item.offer === "object") {
+        map[Number(item.router_index)] = item.offer as Record<string, unknown>;
+      }
+    }
+    return map;
+  }
+
+  if ("airlineName" in obj || "totalAmount" in obj) {
+    return { 0: obj };
+  }
+
+  return {};
 }
 
 /**

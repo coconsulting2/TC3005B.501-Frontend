@@ -3,13 +3,26 @@
  */
 import { useCallback, useEffect, useId, useRef, useState } from "react";
 
+type TooltipAlign = "start" | "center" | "end";
+
+const ALIGN_STYLES: Record<
+  TooltipAlign,
+  { left?: string | number; right?: string | number; transform?: string }
+> = {
+  start: { left: 0, transform: "none" },
+  center: { left: "50%", transform: "translateX(-50%)" },
+  end: { right: 0, left: "auto", transform: "none" },
+};
+
 interface Props {
   text: string;
   /** Etiqueta accesible cuando el tooltip está cerrado */
   label?: string;
+  /** Alineación horizontal para evitar recorte en bordes del modal */
+  align?: TooltipAlign;
 }
 
-export default function InfoTooltip({ text, label = "Más información" }: Props) {
+export default function InfoTooltip({ text, label = "Más información", align = "center" }: Props) {
   const [hover, setHover] = useState(false);
   const [pinned, setPinned] = useState(false);
   const open = hover || pinned;
@@ -75,9 +88,8 @@ export default function InfoTooltip({ text, label = "Más información" }: Props
           style={{
             position: "absolute",
             zIndex: 50,
-            left: "50%",
             bottom: "calc(100% + 8px)",
-            transform: "translateX(-50%)",
+            ...ALIGN_STYLES[align],
             width: "max-content",
             maxWidth: 280,
             padding: "10px 12px",
