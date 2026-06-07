@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { http, HttpResponse } from "msw";
 import WorkflowRulesAdmin from "@views/admin/WorkflowRulesAdmin";
@@ -72,11 +72,7 @@ describe("WorkflowRulesAdmin", () => {
     const modal = dialog.closest("div")?.parentElement?.parentElement;
     expect(modal).toBeTruthy();
 
-    const paramSelect = screen.getByLabelText(/parámetro/i) as HTMLSelectElement | null;
-    const selects = screen.getAllByRole("combobox");
-    const param = selects.find((s) =>
-      Array.from((s as HTMLSelectElement).options).some((o) => o.text === "Destino"),
-    ) as HTMLSelectElement;
+    const param = screen.getByLabelText(/parámetro/i) as HTMLSelectElement;
     await user.selectOptions(param, "destino");
 
     await waitFor(() => {

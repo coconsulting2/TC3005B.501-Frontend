@@ -929,20 +929,8 @@ function CollapsibleField({
   visible: boolean;
   children: React.ReactNode;
 }) {
-  return (
-    <div
-      style={{
-        overflow: "hidden",
-        maxHeight: visible ? 120 : 0,
-        opacity: visible ? 1 : 0,
-        transition: "max-height 0.2s ease, opacity 0.2s ease",
-        gridColumn: visible ? undefined : "span 1",
-      }}
-      aria-hidden={!visible}
-    >
-      {visible ? children : null}
-    </div>
-  );
+  if (!visible) return null;
+  return <div>{children}</div>;
 }
 
 const inputStyle: React.CSSProperties = {
