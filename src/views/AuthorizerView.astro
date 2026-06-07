@@ -8,7 +8,6 @@
 
 import EditorialHeader from "@components/EditorialHeader.astro";
 import MetricCard from "@components/MetricCard.astro";
-import RequestSection from "@components/RequestSection.astro";
 import { apiRequest } from "@utils/apiClient";
 import { getCookie } from "@data/cookies";
 
@@ -79,7 +78,7 @@ const roleLabel = role === "N1" ? "Jefe directo" : "Finanzas";
                     {request.requester_name || 'Solicitante'} <span class="text-[var(--color-ink-muted)] font-normal text-xs uppercase tracking-wide ml-1">{request.department_name || ''}</span>
                   </p>
                   <p class="text-xs text-[var(--color-ink-muted)] mt-0.5 truncate">
-                    Viaje a {request.destination_country} &middot; {request.beginning_date} &ndash; {request.ending_date}
+                    {request.trip_name || (request.destination_country ? `Viaje a ${request.destination_country}` : "Viaje")} &middot; {request.beginning_date} &ndash; {request.ending_date}
                   </p>
                 </div>
               </div>

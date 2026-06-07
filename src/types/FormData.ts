@@ -2,6 +2,7 @@ import type { TravelRoute } from './TravelRoute';
 
 export interface FormData {
   router_index: number;
+  trip_name: string;
   notes: string;
   requested_fee: number | string;
   imposed_fee: number | string;

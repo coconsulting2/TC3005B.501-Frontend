@@ -21,6 +21,7 @@ interface Column {
 const columns: Column[] = [
   { key: 'request_id', label: 'ID Viaje' },
   { key: 'requester_name', label: 'Solicitante' },
+  { key: 'trip_name', label: 'Motivo' },
   { key: 'destination_country', label: 'Destino' },
   { key: 'beginning_date', label: 'Fecha Salida' },
   { key: 'ending_date', label: 'Fecha Llegada' },
@@ -41,6 +42,7 @@ export default function CxPAllRequestsList({ data, role }: Props) {
     return (
       r.request_id?.toString().includes(term) ||
       (r.requester_name && r.requester_name.toLowerCase().includes(term)) ||
+      (r.trip_name && r.trip_name.toLowerCase().includes(term)) ||
       (r.destination_country && r.destination_country.toLowerCase().includes(term)) ||
       (r.request_status && r.request_status.toLowerCase().includes(term))
     );
@@ -56,6 +58,7 @@ export default function CxPAllRequestsList({ data, role }: Props) {
     // Map status specifically for the DataTable badge
     const paged = filteredData.slice(start, end).map(r => ({
       ...r,
+      trip_name: r.trip_name || (r.destination_country ? `Viaje a ${r.destination_country}` : '—'),
       status: r.request_status // DataTable uses 'status' key for the StatusBadge column logic
     }));
     setVisibleRequests(paged);
@@ -66,7 +69,7 @@ export default function CxPAllRequestsList({ data, role }: Props) {
       <div className="mb-4">
         <input
           type="text"
-          placeholder="Buscar por ID, solicitante, destino o estatus..."
+          placeholder="Buscar por ID, solicitante, motivo, destino o estatus..."
           className="w-full md:w-1/2 px-4 py-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-coco-primary focus:border-transparent text-sm"
           value={searchTerm}
           onChange={(e) => {

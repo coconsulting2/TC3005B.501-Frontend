@@ -32,6 +32,7 @@ const emptyRoute: TravelRoute = {
 
 const initialFormState: FormData = {
   ...emptyRoute,
+  trip_name: '',
   notes: '',
   requested_fee: '',
   imposed_fee: 0,
@@ -219,6 +220,7 @@ export default function TravelRequestForm({ data, mode, request_id, user_id, rol
       !firstRoute.ending_date ||
       !firstRoute.ending_time ||
       !formData.requested_fee ||
+      !formData.trip_name?.trim() ||
       !formData.notes
     ) {
       setError('Por favor, completa todos los campos requeridos de forma correcta antes de enviar la solicitud.');
@@ -230,6 +232,7 @@ export default function TravelRequestForm({ data, mode, request_id, user_id, rol
 
     const dataToSend = {
       router_index: firstRoute.router_index,
+      trip_name: formData.trip_name.trim(),
       notes: formData.notes,
       requested_fee: parseFloat(formData.requested_fee as string) || 0,
       imposed_fee: 0,
@@ -282,6 +285,7 @@ export default function TravelRequestForm({ data, mode, request_id, user_id, rol
     const draftData: Record<string, any> = {};
 
     if (firstRoute.router_index !== undefined) draftData.router_index = firstRoute.router_index;
+    if (formData.trip_name?.trim()) draftData.trip_name = formData.trip_name.trim();
     if (formData.notes) draftData.notes = formData.notes;
     if (formData.requested_fee) draftData.requested_fee = parseFloat(formData.requested_fee as string) || 0;
     draftData.imposed_fee = 0; // Always send imposed_fee as 0
@@ -365,6 +369,7 @@ export default function TravelRequestForm({ data, mode, request_id, user_id, rol
         firstRoute.ending_date,
         firstRoute.ending_time,
         formData.requested_fee,
+        formData.trip_name?.trim(),
         formData.notes,
       ].some(field => !field);
 
@@ -392,6 +397,9 @@ export default function TravelRequestForm({ data, mode, request_id, user_id, rol
     };
 
     includeIfExists('router_index', firstRoute.router_index);
+    if (formData.trip_name?.trim()) {
+      editedData.trip_name = formData.trip_name.trim();
+    }
     editedData.notes = typeof formData.notes === 'string' ? formData.notes.trim() : '';
     includeIfExists('requested_fee', parseFloat(formData.requested_fee as string));
     editedData.imposed_fee = 0;
@@ -474,6 +482,7 @@ export default function TravelRequestForm({ data, mode, request_id, user_id, rol
       !firstRoute.ending_date ||
       !firstRoute.ending_time ||
       !formData.requested_fee ||
+      !formData.trip_name?.trim() ||
       !formData.notes
     ) {
       setError('Por favor, completa todos los campos requeridos de forma correcta antes de enviar la solicitud.');
@@ -573,6 +582,19 @@ export default function TravelRequestForm({ data, mode, request_id, user_id, rol
               setDisplayFee(formData.requested_fee ? String(formData.requested_fee) : '');
             }}
             required 
+          />
+        </div>
+        <div>
+          <label className="block text-sm font-medium mb-1">Nombre o Motivo del viaje<span className="text-red-500"> *</span></label>
+          <input
+            type="text"
+            name="trip_name"
+            maxLength={120}
+            className={inputStyle}
+            value={formData.trip_name}
+            onChange={handleGeneralChange}
+            placeholder="Ej. Reunión con cliente en CDMX"
+            required
           />
         </div>
         <div>
