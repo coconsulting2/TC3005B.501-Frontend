@@ -7,6 +7,9 @@
  */
 
 const { request, urlBase, subtitle } = Astro.props;
+
+const tripTitle = request.trip_name
+  || (request.destination_country ? `Viaje a ${request.destination_country}` : 'Viaje');
 ---
 
 <a href={`/${urlBase}/${request.request_id}`} class="block">
@@ -14,8 +17,11 @@ const { request, urlBase, subtitle } = Astro.props;
     <div class="flex items-start justify-between mb-3">
       <div>
         <p class="font-medium text-[var(--color-ink)]">
-          Viaje a {request.destination_country}
+          {tripTitle}
         </p>
+        {request.requester_name && (
+          <p class="text-xs text-[var(--color-ink-muted)] mt-0.5">{request.requester_name}</p>
+        )}
         <p class="text-xs text-[var(--color-ink-muted)] mt-0.5">{subtitle}</p>
       </div>
       <span class="text-sm font-medium text-[var(--color-ink-muted)] font-editorial tabular-nums">

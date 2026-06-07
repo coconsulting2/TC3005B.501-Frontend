@@ -120,7 +120,7 @@ const toVerify = requests.filter((r: any) =>
                 </span>
                 <a href={`/detalles-solicitud/${request.request_id}`} class="block min-w-0 flex-1">
                   <p class="font-medium text-[var(--color-ink)] break-words">
-                    {request.destination_country}
+                    {request.trip_name || request.destination_country}
                   </p>
                   <p class="text-xs text-[var(--color-ink-muted)] mt-1 leading-snug">
                     #{request.request_id} &middot; {request.beginning_date} &ndash; {request.ending_date}

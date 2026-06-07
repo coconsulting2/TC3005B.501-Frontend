@@ -23,3 +23,36 @@ export interface WorkflowRuleDTO {
   targetRole: string | null;
   createdAt?: string;
 }
+
+/** Payload para crear/editar (sin id ni active). */
+export type WorkflowRuleFormData = Omit<
+  WorkflowRuleDTO,
+  "id" | "active" | "createdAt" | "departmentName" | "costsCenter"
+>;
+
+export interface WorkflowRulePreviewRequest {
+  amount: number;
+  ruleType?: WfRuleType;
+  departmentId?: number | null;
+  currency?: string;
+  destinationCountryIds?: number[];
+  receiptTypeIds?: number[];
+  orgLevel?: number | null;
+  draftRule?: WorkflowRuleFormData;
+  editingRuleId?: string;
+}
+
+export interface WorkflowRulePreviewResponse {
+  levels: number[];
+  minApprovalLevel: number;
+  maxApprovalLevel: number;
+  skipApplied: boolean;
+  initialStatusId: number;
+  initialStatusLabel: string;
+  summary: string;
+  hints: string[];
+  matchedImportBand?: { threshold: number; approvalLevel: number } | null;
+  targetRole?: string | null;
+  amountEvaluated: number;
+  currencyEvaluated: string;
+}
