@@ -529,6 +529,24 @@ export default function TravelRequestForm({ data, mode, request_id, user_id, rol
         </p>
       </div>
 
+      <div>
+        <label className="block text-sm font-medium mb-1">
+          Nombre o Motivo del viaje<span className="text-red-500"> *</span>
+        </label>
+        <input
+          type="text"
+          name="trip_name"
+          maxLength={120}
+          className={inputStyle}
+          value={formData.trip_name}
+          onChange={handleGeneralChange}
+          placeholder="Ej. Reunión con cliente en CDMX"
+          required
+        />
+      </div>
+
+      <hr className="border-gray-300" />
+
       {/* Render all routes dynamically */}
       {formData.routes.map((route, index) => (
         <RouteInputGroup
@@ -582,19 +600,6 @@ export default function TravelRequestForm({ data, mode, request_id, user_id, rol
               setDisplayFee(formData.requested_fee ? String(formData.requested_fee) : '');
             }}
             required 
-          />
-        </div>
-        <div>
-          <label className="block text-sm font-medium mb-1">Nombre o Motivo del viaje<span className="text-red-500"> *</span></label>
-          <input
-            type="text"
-            name="trip_name"
-            maxLength={120}
-            className={inputStyle}
-            value={formData.trip_name}
-            onChange={handleGeneralChange}
-            placeholder="Ej. Reunión con cliente en CDMX"
-            required
           />
         </div>
         <div>

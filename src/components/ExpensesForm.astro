@@ -4,6 +4,14 @@ import { getCookie } from "@data/cookies";
 import { apiRequest } from "@utils/apiClient";
 import { requestAllowsReceiptUpload } from "@utils/receiptUploadAccess";
 
+interface RequestRouteSummary {
+  destination_country?: string | null;
+  destination_city?: string;
+  origin_city?: string;
+  beginning_date?: string | null;
+  ending_date?: string | null;
+}
+
 const { id } = Astro.params;
 
 const travelData = await (async () => {
@@ -46,18 +54,21 @@ const canUploadReceipts =
     </span>
   </div>
 
-  <p class="text-sm text-gray-600">
-    <strong>Destino:</strong> {travelData.routes[0].destination_country} &nbsp;&nbsp;
-    <strong>Ciudad:</strong> {travelData.routes[0].destination_city} &nbsp;&nbsp;
-    <strong>Fechas:</strong> {travelData.routes[0].beginning_date} - {travelData.routes[0].ending_date}
-  </p>
-
-  <ExpensesFormClient
-    client:only="react"
-    requestId={travelData.request_id}
-    token={getCookie("token", Astro.cookies)}
-    receiptToReplace={Astro.props.receiptToReplace}
-  />
+  <div class="w-full min-w-0">
+    <ExpensesFormClient
+      client:only="react"
+      requestId={travelData.request_id}
+      token={getCookie("token", Astro.cookies)}
+      receiptToReplace={Astro.props.receiptToReplace}
+      initialRoutes={(travelData.routes ?? []).map((route: RequestRouteSummary) => ({
+        destination_country: route.destination_country,
+        destination_city: route.destination_city,
+        origin_city: route.origin_city,
+        beginning_date: route.beginning_date,
+        ending_date: route.ending_date,
+      }))}
+    />
+  </div>
 </section>
 )}
 

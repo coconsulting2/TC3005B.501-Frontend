@@ -59,6 +59,8 @@ const authToken = getCookie("token", Astro.cookies);
         backHref="/comprobaciones"
         showTimeline={false}
         showComments={false}
+        authToken={authToken ?? ""}
+        showResumenTramos={true}
       />
     )}
 

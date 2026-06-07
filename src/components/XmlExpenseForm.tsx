@@ -1,4 +1,7 @@
 /**
+ * @deprecated Usar ExpensesForm en /subir-comprobante/[id] (FxConversionPanel + flujo internacional).
+ * Se mantiene para tests hasta migrar cobertura.
+ *
  * Author: Emiliano Deyta
  *
  * Description:

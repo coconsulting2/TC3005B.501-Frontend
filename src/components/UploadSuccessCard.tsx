@@ -28,6 +28,7 @@ interface CfdiRegistroResponse {
   metodoPago?: string;
   formaPago?: string;
   tipoComprobante?: string;
+  tipoCambio?: number;
   version?: string;
   [key: string]: unknown;
 }
@@ -135,6 +136,11 @@ export default function UploadSuccessCard({
   const fecha = reg?.fechaEmision ?? cfdi?.fecha;
   const moneda = reg?.moneda ?? "MXN";
   const satEstado = reg?.satEstado;
+  const tipoCambio = typeof reg?.tipoCambio === "number" ? reg.tipoCambio : undefined;
+  const totalMxn =
+    isInternational && tipoCambio != null && total != null
+      ? total * tipoCambio
+      : undefined;
   const metodoPago = reg?.metodoPago;
   const formaPago = reg?.formaPago;
 
@@ -149,10 +155,24 @@ export default function UploadSuccessCard({
         </div>
         <div className="flex-1 min-w-0">
           <h3 className="text-lg font-semibold text-[var(--color-ink)]">
-            Comprobante registrado correctamente
+            {isInternational
+              ? "Comprobante internacional registrado"
+              : "Comprobante registrado correctamente"}
           </h3>
           <p className="text-sm text-[var(--color-ink-muted)] mt-0.5">
-            Tu comprobante de <strong className="text-[var(--color-ink-secondary)]">{concepto}</strong> fue validado con el SAT y guardado.
+            {isInternational ? (
+              <>
+                Tu comprobante de{" "}
+                <strong className="text-[var(--color-ink-secondary)]">{concepto}</strong> fue
+                guardado con tipo de cambio referencial del día.
+              </>
+            ) : (
+              <>
+                Tu comprobante de{" "}
+                <strong className="text-[var(--color-ink-secondary)]">{concepto}</strong> fue
+                validado con el SAT y guardado.
+              </>
+            )}
           </p>
         </div>
       </div>
@@ -166,7 +186,7 @@ export default function UploadSuccessCard({
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
             </svg>
             <span className="text-sm font-medium text-[var(--color-ink-secondary)]">
-              Detalle fiscal
+              {isInternational ? "Detalle del gasto" : "Detalle fiscal"}
             </span>
           </div>
           {satBadge(satEstado)}
@@ -201,6 +221,23 @@ export default function UploadSuccessCard({
               <p className="text-base font-bold text-primary-600">{fmtMoney(total, moneda)}</p>
             </div>
           </div>
+
+          {isInternational && tipoCambio != null && (
+            <div className="grid grid-cols-2 text-center divide-x divide-[var(--color-neutral-100)] border-t border-[var(--color-neutral-100)]">
+              <div className="px-4 py-3">
+                <p className="text-xs text-[var(--color-ink-muted)] mb-0.5">Tipo de cambio</p>
+                <p className="text-sm font-semibold text-[var(--color-ink)] tabular-nums">
+                  {tipoCambio.toFixed(4)}
+                </p>
+              </div>
+              <div className="px-4 py-3 bg-primary-50/30">
+                <p className="text-xs text-primary-500 mb-0.5 font-medium">Total en MXN</p>
+                <p className="text-base font-bold text-primary-600 money-display tabular-nums">
+                  {fmtMoney(totalMxn, "MXN")}
+                </p>
+              </div>
+            </div>
+          )}
 
           {/* Metadata row */}
           <div className="px-5 py-3 flex flex-wrap gap-x-6 gap-y-2 text-xs text-[var(--color-ink-muted)]">

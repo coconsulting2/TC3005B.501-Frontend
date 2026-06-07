@@ -1,9 +1,11 @@
 import { describe, it, expect } from "vitest";
 import {
   buildFlightSearchDefaults,
+  buildFlightSegmentsForQuote,
   buildHotelSearchDefaults,
   cityNameToIata,
   computeAgencyServiceFlags,
+  parseStoredFlightOffers,
 } from "@/utils/travelRequestAgency";
 
 describe("travelRequestAgency", () => {
@@ -51,6 +53,42 @@ describe("travelRequestAgency", () => {
       },
     ]);
     expect(d?.fecha_regreso).toBeUndefined();
+  });
+
+  it("buildFlightSegmentsForQuote devuelve un tramo por cada plane_needed", () => {
+    const segments = buildFlightSegmentsForQuote([
+      {
+        router_index: 0,
+        plane_needed: true,
+        origin_city: "CDMX",
+        destination_city: "Monterrey",
+        beginning_date: "2026-08-01",
+      },
+      {
+        router_index: 1,
+        plane_needed: true,
+        origin_city: "Monterrey",
+        destination_city: "Guadalajara",
+        beginning_date: "2026-08-03",
+      },
+      { router_index: 2, plane_needed: false, origin_city: "GDL", destination_city: "CDMX" },
+    ]);
+    expect(segments).toHaveLength(2);
+    expect(segments[0].routerIndex).toBe(0);
+    expect(segments[1].routerIndex).toBe(1);
+    expect(segments[0].defaults.origen).toBe("MEX");
+    expect(segments[1].defaults.destino).toBe("GDL");
+  });
+
+  it("parseStoredFlightOffers lee formato v2 y legacy", () => {
+    const v2 = parseStoredFlightOffers({
+      version: 2,
+      segments: [{ router_index: 1, offer: { airlineName: "Test", totalAmount: 100 } }],
+    });
+    expect(v2[1]?.airlineName).toBe("Test");
+
+    const legacy = parseStoredFlightOffers({ airlineName: "Legacy", totalAmount: 50 });
+    expect(legacy[0]?.airlineName).toBe("Legacy");
   });
 
   it("buildHotelSearchDefaults usa primer tramo con hotel", () => {

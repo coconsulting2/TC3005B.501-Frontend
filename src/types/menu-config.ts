@@ -10,6 +10,7 @@ export const SIDEBAR_CONFIG: Record<string, MenuItem[]> = {
     { label: 'CREAR SOLICITUD', route: '/crear-solicitud', icon: 'flight' },
     { label: 'DRAFT SOLICITUDES', route: '/solicitudes-draft', icon: 'draft' },
     { label: 'GASTOS (COMPROBAR)', route: '/comprobar-gastos', icon: 'payments' },
+    { label: 'RESUMEN POR TRAMOS', route: '/resumen-tramos', icon: 'route' },
     { label: 'REEMBOLSOS', route: '/reembolso', icon: 'paid' },
     { label: 'HISTORIAL DE VIAJES', route: '/historial', icon: 'inventory' }
   ],
@@ -20,6 +21,7 @@ export const SIDEBAR_CONFIG: Record<string, MenuItem[]> = {
     { label: 'CREAR SOLICITUD', route: '/crear-solicitud', icon: 'flight' },
     { label: 'DRAFT SOLICITUDES', route: '/solicitudes-draft', icon: 'draft' },
     { label: 'GASTOS (COMPROBAR)', route: '/comprobar-gastos', icon: 'payments' },
+    { label: 'RESUMEN POR TRAMOS', route: '/resumen-tramos', icon: 'route' },
     { label: 'REEMBOLSOS', route: '/reembolso', icon: 'paid' },
     { label: 'GASTO POR CC', route: '/reportes/gastos-por-centro', icon: 'insights' },
     { label: 'HISTORIAL DE VIAJES', route: '/historial', icon: 'inventory' }
@@ -31,6 +33,7 @@ export const SIDEBAR_CONFIG: Record<string, MenuItem[]> = {
     { label: 'CREAR SOLICITUD', route: '/crear-solicitud', icon: 'flight' },
     { label: 'DRAFT SOLICITUDES', route: '/solicitudes-draft', icon: 'draft' },
     { label: 'GASTOS (COMPROBAR)', route: '/comprobar-gastos', icon: 'payments' },
+    { label: 'RESUMEN POR TRAMOS', route: '/resumen-tramos', icon: 'route' },
     { label: 'REEMBOLSOS', route: '/reembolso', icon: 'paid' },
     { label: 'GASTO POR CC', route: '/reportes/gastos-por-centro', icon: 'insights' },
     { label: 'HISTORIAL DE VIAJES', route: '/historial', icon: 'inventory' }
@@ -40,6 +43,7 @@ export const SIDEBAR_CONFIG: Record<string, MenuItem[]> = {
     { label: 'TODAS LAS SOLICITUDES', route: '/todas-las-solicitudes', icon: 'list_alt' },
     { label: 'COTIZACIONES', route: '/cotizaciones', icon: 'paid' },
     { label: 'COMPROBACIONES', route: '/comprobaciones', icon: 'receipt' },
+    { label: 'RESUMEN POR TRAMOS', route: '/resumen-tramos', icon: 'route' },
     { label: 'EXPORTAR ERP', route: '/exportar-contable', icon: 'cloud_upload' },
     { label: 'GASTO POR CC', route: '/reportes/gastos-por-centro', icon: 'insights' }
   ],

@@ -12,10 +12,12 @@ import ReceiptDetailCard from "@components/ReceiptDetailCard";
 import { getCookie } from "@data/cookies";
 import type { UserRole } from "@type/roles";
 import ValidateReceiptStatus from "@components/ValidateReceiptStatus.tsx";
+import ResumenTramos from "@components/ResumenTramos";
 
 const userName = getCookie("username", Astro.cookies);
 const role = getCookie("role", Astro.cookies) as UserRole;
 const buttonLabel = role;
+const token = getCookie("token", Astro.cookies) ?? "";
 
 import { apiRequest } from "@/utils/apiClient";
 import { requestAllowsReceiptUpload } from "@utils/receiptUploadAccess";
@@ -139,6 +141,14 @@ const enrichedExpenses = request ? await Promise.all(
           </p>
         </div>
       )}
+    </section>
+
+    <section class="card-editorial p-5 sm:p-8 mt-6">
+      <ResumenTramos
+        client:only="react"
+        requestId={Number(id)}
+        token={token}
+      />
     </section>
   </main>
 

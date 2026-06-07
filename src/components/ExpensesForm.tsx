@@ -1,5 +1,6 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect, useMemo } from "react";
 import FileDropZone from "@components/FileDropZone";
+import Select from "@components/Select.tsx";
 import type { FileDropZoneHandle, ReceiptUploadResponse } from "@components/FileDropZone";
 import { isDevTaxPreviewEnabled } from "@components/CfdiDevPreview";
 import UploadSuccessCard from "@components/UploadSuccessCard";
@@ -11,6 +12,7 @@ import PolicyExceptionModal from "@components/PolicyExceptionModal";
 import { apiRequest } from "@utils/apiClient";
 import { extractCfdiTotalFromXml, extractCfdiUuidFromXml } from "@utils/cfdiXml";
 import { showAppAlert } from "@utils/appAlert";
+import FxConversionPanel from "@components/FxConversionPanel";
 
 // Mapping concepto (label) → receiptTypeId del seed (M2-006).
 const CONCEPTO_TO_RECEIPT_TYPE_ID: Record<string, number> = {
@@ -66,13 +68,48 @@ function formatCreateReceiptError(err: unknown): string {
   return "No se pudo crear el comprobante. Revisa la conexión o vuelve a intentar.";
 }
 
+interface TripRouteSummary {
+  destination_country?: string | null;
+  destination_city?: string;
+  origin_city?: string;
+  beginning_date?: string | null;
+  ending_date?: string | null;
+}
+
 interface Props {
   requestId: number;
   token: string;
   receiptToReplace?: string | null;
+  initialRoutes?: TripRouteSummary[];
 }
 
-export default function ExpensesFormClient({ requestId, token, receiptToReplace }: Props) {
+interface TramoOption {
+  tramo_id: number;
+  label: string;
+  origin_city: string;
+  destination_country: string | null;
+  destination_city: string;
+  beginning_date: string | null;
+  ending_date: string | null;
+}
+
+function formatTripDate(dateStr: string | null | undefined): string {
+  if (!dateStr) return "—";
+  const d = new Date(dateStr.includes("T") ? dateStr : `${dateStr}T12:00:00`);
+  if (Number.isNaN(d.getTime())) return dateStr;
+  return d.toLocaleDateString("es-MX", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+  });
+}
+
+export default function ExpensesFormClient({
+  requestId,
+  token,
+  receiptToReplace,
+  initialRoutes = [],
+}: Props) {
   const [concepto, setConcepto] = useState("Transporte");
   const [monto, setMonto] = useState("");
   const [showValidation, setShowValidation] = useState(false);
@@ -94,9 +131,98 @@ export default function ExpensesFormClient({ requestId, token, receiptToReplace 
   const [policyPreview, setPolicyPreview] = useState<PolicyPreviewResult | null>(null);
   const [showExceptionModal, setShowExceptionModal] = useState(false);
   const [exceptionAuthorized, setExceptionAuthorized] = useState(false);
+  const [tramos, setTramos] = useState<TramoOption[]>([]);
+  const [selectedRouteId, setSelectedRouteId] = useState<number | "">("");
 
   const dropZoneRef = useRef<FileDropZoneHandle>(null);
   const showDevPanel = isDevTaxPreviewEnabled();
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`${API_BASE_URL}/viajes/${requestId}/resumen-tramos`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+          credentials: "include",
+        });
+        if (!res.ok) return;
+        const json = await res.json();
+        if (cancelled || !Array.isArray(json.tramos)) return;
+        const options: TramoOption[] = json.tramos
+          .filter((t: { tramo_id: number | null; unassigned?: boolean }) =>
+            t.tramo_id != null && !t.unassigned,
+          )
+          .map(
+            (t: {
+              tramo_id: number;
+              origin_city: string;
+              destination_city: string;
+              destination_country: string | null;
+              beginning_date: string | null;
+              ending_date: string | null;
+            }) => ({
+              tramo_id: t.tramo_id,
+              label: `${t.origin_city} → ${t.destination_city}`,
+              origin_city: t.origin_city,
+              destination_country: t.destination_country,
+              destination_city: t.destination_city,
+              beginning_date: t.beginning_date,
+              ending_date: t.ending_date,
+            }),
+          );
+        setTramos(options);
+        if (options.length === 1) {
+          setSelectedRouteId(options[0].tramo_id);
+        }
+      } catch {
+        /* resumen opcional: viaje directo se auto-asigna en backend */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [requestId, token]);
+
+  const activeTramo = useMemo(() => {
+    if (tramos.length === 0) return null;
+    if (selectedRouteId !== "") {
+      return tramos.find((t) => t.tramo_id === selectedRouteId) ?? null;
+    }
+    if (tramos.length === 1) return tramos[0];
+    return null;
+  }, [tramos, selectedRouteId]);
+
+  const tripSummary = useMemo(() => {
+    if (activeTramo) {
+      return {
+        destino: activeTramo.destination_country ?? "—",
+        ciudad: activeTramo.destination_city,
+        fechas: `${formatTripDate(activeTramo.beginning_date)} – ${formatTripDate(activeTramo.ending_date)}`,
+        tramoLabel: activeTramo.label,
+        isPending: false as const,
+      };
+    }
+
+    if (tramos.length === 0 && initialRoutes.length === 1) {
+      const route = initialRoutes[0];
+      return {
+        destino: route.destination_country ?? "—",
+        ciudad: route.destination_city ?? "—",
+        fechas: `${formatTripDate(route.beginning_date)} – ${formatTripDate(route.ending_date)}`,
+        isPending: false as const,
+      };
+    }
+
+    const tramoCount = tramos.length > 0 ? tramos.length : initialRoutes.length;
+    if (tramoCount > 1) {
+      return { isPending: true as const, tramoCount };
+    }
+
+    return null;
+  }, [activeTramo, tramos.length, initialRoutes]);
 
   /**
    * Llama POST /policies/preview para validar el gasto contra la política aplicable.
@@ -219,6 +345,14 @@ export default function ExpensesFormClient({ requestId, token, receiptToReplace 
         }
       }
 
+      if (tramos.length > 1 && selectedRouteId === "") {
+        showAppAlert("Selecciona el tramo al que corresponde este comprobante.", {
+          variant: "warning",
+        });
+        setSubmitting(false);
+        return;
+      }
+
       let lastReceiptId: number | null = null;
       try {
         const res = await submitTravelExpense({
@@ -228,6 +362,7 @@ export default function ExpensesFormClient({ requestId, token, receiptToReplace 
           token,
           cfdiUuid: cfdiUuid ?? undefined,
           allowMissingCfdiUuid: isInternational,
+          routeId: selectedRouteId === "" ? undefined : selectedRouteId,
         });
         lastReceiptId = res.lastReceiptId;
       } catch (createErr) {
@@ -262,7 +397,7 @@ export default function ExpensesFormClient({ requestId, token, receiptToReplace 
         const ymd = fechaComprobante.trim();
         const emisionIntl = new Date(`${ymd}T12:00:00`);
         try {
-          await apiRequest(`/comprobantes/${lastReceiptId}`, {
+          const regRes = await apiRequest<Record<string, unknown>>(`/comprobantes/${lastReceiptId}`, {
             method: "POST",
             data: {
               is_international: true,
@@ -274,6 +409,7 @@ export default function ExpensesFormClient({ requestId, token, receiptToReplace 
             },
             headers: { Authorization: `Bearer ${token}` },
           });
+          setDevRegistroResponse(regRes);
         } catch (regErr) {
           console.error(regErr);
           const msg = formatRegistroError(regErr);
@@ -334,7 +470,34 @@ export default function ExpensesFormClient({ requestId, token, receiptToReplace 
   }
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 w-full min-w-0">
+      {tripSummary && (
+        <div className="rounded-[var(--radius-md)] border border-[var(--color-neutral-200)] bg-[var(--color-surface-secondary)] px-4 py-3 space-y-1">
+          {tripSummary.isPending ? (
+            <p className="text-sm text-[var(--color-ink-secondary)]">
+              <strong className="text-[var(--color-ink)]">Viaje multidestino</strong> ·{" "}
+              {tripSummary.tramoCount} tramos. Selecciona un tramo abajo para ver destino y fechas
+              del comprobante.
+            </p>
+          ) : (
+            <>
+              <p className="text-sm text-[var(--color-ink-secondary)]">
+                <strong className="text-[var(--color-ink)]">Destino:</strong> {tripSummary.destino}
+                &nbsp;&nbsp;
+                <strong className="text-[var(--color-ink)]">Ciudad:</strong> {tripSummary.ciudad}
+                &nbsp;&nbsp;
+                <strong className="text-[var(--color-ink)]">Fechas:</strong> {tripSummary.fechas}
+              </p>
+              {"tramoLabel" in tripSummary && tripSummary.tramoLabel && tramos.length > 1 && (
+                <p className="text-xs text-[var(--color-ink-muted)]">
+                  Tramo seleccionado: <span className="font-medium">{tripSummary.tramoLabel}</span>
+                </p>
+              )}
+            </>
+          )}
+        </div>
+      )}
+
       {/* ── Form fields ── */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
         <div>
@@ -365,7 +528,7 @@ export default function ExpensesFormClient({ requestId, token, receiptToReplace 
             htmlFor="monto"
             className="block text-sm font-medium mb-1.5 text-[var(--color-ink-secondary)]"
           >
-            Monto
+            {isInternational ? `Monto en ${intlCurrency}` : "Monto"}
           </label>
           <input
             id="monto"
@@ -382,6 +545,25 @@ export default function ExpensesFormClient({ requestId, token, receiptToReplace 
             required
           />
         </div>
+
+        {tramos.length > 1 && (
+          <div className="sm:col-span-2 md:col-span-4 w-full min-w-0">
+            <Select
+              label="Tramo del viaje"
+              name="tramo"
+              placeholder="Selecciona un tramo…"
+              required
+              className="mb-0"
+              value={selectedRouteId === "" ? "" : String(selectedRouteId)}
+              options={tramos.map((t) => ({
+                value: String(t.tramo_id),
+                label: t.label,
+              }))}
+              onChange={(value) => setSelectedRouteId(value ? Number(value) : "")}
+              helperText="En viajes multidestino, cada comprobante debe asociarse al tramo correspondiente."
+            />
+          </div>
+        )}
       </div>
 
       {/* ── International toggle ── */}
@@ -392,48 +574,57 @@ export default function ExpensesFormClient({ requestId, token, receiptToReplace 
           onChange={(e) => setIsInternational(e.target.checked)}
           className="accent-primary-400"
         />
-        Es en moneda extranjera
+        Gasto en moneda extranjera (sin CFDI mexicano)
       </label>
 
       {isInternational && (
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          <div>
-            <label
-              htmlFor="intlCurrency"
-              className="block text-sm font-medium mb-1.5 text-[var(--color-ink-secondary)]"
-            >
-              Moneda del recibo
-            </label>
-            <select
-              id="intlCurrency"
-              className="w-full border border-[var(--color-neutral-300)] rounded-[var(--radius-md)] px-3 py-2.5 text-sm bg-[var(--color-surface-white)] text-[var(--color-ink)]"
-              value={intlCurrency}
-              onChange={(e) =>
-                setIntlCurrency(e.target.value as typeof intlCurrency)
-              }
-            >
-              <option value="USD">USD</option>
-              <option value="EUR">EUR</option>
-              <option value="GBP">GBP</option>
-              <option value="JPY">JPY</option>
-              <option value="CAD">CAD</option>
-            </select>
+        <div className="card-editorial p-5 space-y-4">
+          <p className="eyebrow mb-0">Gasto internacional</p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label
+                htmlFor="intlCurrency"
+                className="block text-sm font-medium mb-1.5 text-[var(--color-ink-secondary)]"
+              >
+                Moneda del recibo
+              </label>
+              <select
+                id="intlCurrency"
+                className="w-full border border-[var(--color-neutral-300)] rounded-[var(--radius-md)] px-3 py-2.5 text-sm bg-[var(--color-surface-white)] text-[var(--color-ink)]"
+                value={intlCurrency}
+                onChange={(e) =>
+                  setIntlCurrency(e.target.value as typeof intlCurrency)
+                }
+              >
+                <option value="USD">USD</option>
+                <option value="EUR">EUR</option>
+                <option value="GBP">GBP</option>
+                <option value="JPY">JPY</option>
+                <option value="CAD">CAD</option>
+              </select>
+            </div>
+            <div>
+              <label
+                htmlFor="fechaComprobante"
+                className="block text-sm font-medium mb-1.5 text-[var(--color-ink-secondary)]"
+              >
+                Fecha del gasto
+              </label>
+              <input
+                id="fechaComprobante"
+                type="date"
+                className="w-full border border-[var(--color-neutral-300)] rounded-[var(--radius-md)] px-3 py-2.5 text-sm bg-[var(--color-surface-white)] text-[var(--color-ink)]"
+                value={fechaComprobante}
+                onChange={(e) => setFechaComprobante(e.target.value)}
+              />
+            </div>
           </div>
-          <div>
-            <label
-              htmlFor="fechaComprobante"
-              className="block text-sm font-medium mb-1.5 text-[var(--color-ink-secondary)]"
-            >
-              Fecha del gasto
-            </label>
-            <input
-              id="fechaComprobante"
-              type="date"
-              className="w-full border border-[var(--color-neutral-300)] rounded-[var(--radius-md)] px-3 py-2.5 text-sm bg-[var(--color-surface-white)] text-[var(--color-ink)]"
-              value={fechaComprobante}
-              onChange={(e) => setFechaComprobante(e.target.value)}
-            />
-          </div>
+
+          <FxConversionPanel
+            moneda={intlCurrency}
+            montoOriginal={parseFloat(monto) || 0}
+            enabled={isInternational && Boolean(monto) && !Number.isNaN(parseFloat(monto))}
+          />
         </div>
       )}
 

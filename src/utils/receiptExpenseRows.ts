@@ -51,6 +51,9 @@ function asReceiptCfdi(value: unknown): ReceiptCfdi | null {
     uuid: v.uuid,
     satEstado: String(v.satEstado ?? ""),
     tipoComprobante: String(v.tipoComprobante ?? ""),
+    ...(typeof v.tipoCambio === "number" && v.tipoCambio > 0
+      ? { tipoCambio: v.tipoCambio }
+      : {}),
   };
 }
 

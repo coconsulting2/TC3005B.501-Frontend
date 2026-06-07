@@ -1,7 +1,7 @@
 import type { UserRole } from "@type/roles";
 
-/** Rutas compartidas entre administrador de cliente y super-admin Ditta (ROOT). */
-const routesAdministracion: string[] = [
+/** Rutas de administración para el admin de una org cliente (sin gestión cross-tenant). */
+const routesAdministracionOrgAdmin: string[] = [
   "/dashboard",
   "/perfil-usuario",
   "/crear-usuario",
@@ -9,13 +9,18 @@ const routesAdministracion: string[] = [
   "/admin/expense-policies",
   "/admin/employee-categories",
   "/admin/refund-time-limits",
-  "/admin/organizations",
   "/admin/onboarding-import",
   "/admin/catalogo-contable",
   "/admin/indicadores-impuesto",
   "/admin/mapeo-gastos",
   "/admin/api-keys",
   "/reportes/gastos-por-centro",
+];
+
+/** Super-admin Ditta: mismas rutas de org + listado/creación de organizaciones. */
+const routesAdministracionDitta: string[] = [
+  ...routesAdministracionOrgAdmin,
+  "/admin/organizations",
 ];
 
 export const roleRoutes: Record<UserRole, string[]> = {
@@ -30,6 +35,8 @@ export const roleRoutes: Record<UserRole, string[]> = {
     "/completar-draft/*",
     "/editar-solicitud/*",
     "/comprobar-solicitud/*",
+    "/resumen-tramos",
+    "/resumen-tramos/*",
     "/detalles-solicitud/*",
     "/subir-comprobante/*",
     "/resubir-comprobante/*",
@@ -52,6 +59,8 @@ export const roleRoutes: Record<UserRole, string[]> = {
     "/comprobar-gastos",
     "/comprobar-gastos/*",
     "/comprobar-solicitud/*",
+    "/resumen-tramos",
+    "/resumen-tramos/*",
     "/detalles-solicitud/*",
   ],
   N1: [
@@ -66,6 +75,8 @@ export const roleRoutes: Record<UserRole, string[]> = {
     "/completar-draft/*",
     "/editar-solicitud/*",
     "/comprobar-solicitud/*",
+    "/resumen-tramos",
+    "/resumen-tramos/*",
     "/autorizaciones",
     "/aprobaciones",
     "/detalles-solicitud/*",
@@ -85,6 +96,8 @@ export const roleRoutes: Record<UserRole, string[]> = {
     "/completar-draft/*",
     "/editar-solicitud/*",
     "/comprobar-solicitud/*",
+    "/resumen-tramos",
+    "/resumen-tramos/*",
     "/autorizaciones",
     "/aprobaciones",
     "/detalles-solicitud/*",
@@ -92,8 +105,8 @@ export const roleRoutes: Record<UserRole, string[]> = {
     "/subir-comprobante/*",
     "/reportes/gastos-por-centro",
   ],
-  Administrador: [...routesAdministracion, "/admin/workflow-rules"],
-  "Admin Ditta": routesAdministracion,
+  Administrador: [...routesAdministracionOrgAdmin, "/admin/workflow-rules"],
+  "Admin Ditta": routesAdministracionDitta,
 };
 
 export const allWhitelistedRoutes: string[] = Object.values(roleRoutes).flat();

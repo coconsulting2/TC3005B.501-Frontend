@@ -19,6 +19,8 @@ interface SubmitExpenseParams {
   cfdiUuid?: string | null;
   /** Viaje internacional con XML sustituto: el backend no exige cfdi_uuid ni anti-duplicado por UUID. */
   allowMissingCfdiUuid?: boolean;
+  /** Tramo (route_id) en viajes multidestino. */
+  routeId?: number;
 }
 
 export async function submitTravelExpense({
@@ -28,6 +30,7 @@ export async function submitTravelExpense({
   token,
   cfdiUuid,
   allowMissingCfdiUuid = false,
+  routeId,
 }: SubmitExpenseParams): Promise<{ count: number; lastReceiptId: number | null }> {
   const receipt_type_id = receiptTypeMap[concepto];
   if (!receipt_type_id) throw new Error(`Concepto inválido: ${concepto}`);
@@ -37,6 +40,7 @@ export async function submitTravelExpense({
     request_id: number;
     amount: number;
     cfdi_uuid?: string;
+    route_id?: number;
   } = {
     receipt_type_id,
     request_id: requestId,
@@ -44,6 +48,9 @@ export async function submitTravelExpense({
   };
   if (cfdiUuid && cfdiUuid.trim()) {
     receiptRow.cfdi_uuid = cfdiUuid.trim().toLowerCase();
+  }
+  if (routeId != null && Number.isFinite(routeId)) {
+    receiptRow.route_id = routeId;
   }
 
   const payload: {

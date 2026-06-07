@@ -1,0 +1,150 @@
+---
+/**
+ * Listado de solicitudes con acceso al resumen contable por tramo (US-10).
+ * Solicitante/N1/N2: solo sus solicitudes en fase de comprobación o posterior.
+ * CxP: solicitudes del departamento (6, 7) + historial org (7, 8).
+ */
+export const prerender = false;
+
+import MainLayout from "@layouts/MainLayout.astro";
+import EditorialHeader from "@components/EditorialHeader.astro";
+import MetricCard from "@components/MetricCard.astro";
+import type { UserRole } from "@type/roles";
+import { getCookie } from "@data/cookies";
+import { roleLabels } from "@config/role-labels";
+import { apiRequest } from "@utils/apiClient";
+
+const EXPENSE_PHASE_STATUSES = new Set([
+  "Comprobación gastos del viaje",
+  "Validación de comprobantes",
+  "Finalizado",
+]);
+
+const role: UserRole = getCookie("role", Astro.cookies) as UserRole;
+const userName = getCookie("username", Astro.cookies);
+const buttonLabel = roleLabels[role];
+const user_id = getCookie("id", Astro.cookies);
+const department = getCookie("department_id", Astro.cookies);
+const isCxP = role === "Cuentas por pagar";
+
+type RequestRow = {
+  request_id: number;
+  label: string;
+  beginning_date?: string;
+  ending_date?: string;
+  request_status?: string;
+  status?: string;
+  requester_name?: string;
+};
+
+function mergeById(rows: RequestRow[]): RequestRow[] {
+  const map = new Map<number, RequestRow>();
+  for (const row of rows) {
+    if (!row?.request_id) continue;
+    map.set(Number(row.request_id), { ...map.get(row.request_id), ...row });
+  }
+  return Array.from(map.values()).sort((a, b) => b.request_id - a.request_id);
+}
+
+const requests: RequestRow[] = await (async () => {
+  try {
+    if (isCxP) {
+      const [inComprobacion, inValidacion, historial] = await Promise.all([
+        apiRequest(`/user/get-travel-requests/${department}/6`, { cookies: Astro.cookies }).catch(() => []),
+        apiRequest(`/user/get-travel-requests/${department}/7`, { cookies: Astro.cookies }).catch(() => []),
+        apiRequest(`/accounts-payable/requests`, { cookies: Astro.cookies }).catch(() => []),
+      ]);
+
+      const deptRows: RequestRow[] = [...inComprobacion, ...inValidacion].map((r: any) => ({
+        request_id: r.request_id,
+        label: r.trip_name || r.destination_country || `Solicitud #${r.request_id}`,
+        beginning_date: r.beginning_date,
+        ending_date: r.ending_date,
+        request_status: r.request_status,
+        requester_name: r.requester_name,
+      }));
+
+      const orgRows: RequestRow[] = (historial ?? []).map((r: any) => ({
+        request_id: r.request_id,
+        label: r.trip_name || r.destination_country || `Solicitud #${r.request_id}`,
+        beginning_date: r.beginning_date,
+        ending_date: r.ending_date,
+        request_status: r.request_status,
+        requester_name: r.requester_name,
+      }));
+
+      return mergeById([...deptRows, ...orgRows]);
+    }
+
+    const own = await apiRequest(`/applicant/get-user-requests/${user_id}`, { cookies: Astro.cookies });
+    return (Array.isArray(own) ? own : [])
+      .filter((r: any) => EXPENSE_PHASE_STATUSES.has(r.status))
+      .map((r: any) => ({
+        request_id: r.request_id,
+        label: r.trip_name || r.destination_country || `Solicitud #${r.request_id}`,
+        beginning_date: r.beginning_date,
+        ending_date: r.ending_date,
+        status: r.status,
+      }));
+  } catch {
+    return [];
+  }
+})();
+
+const listSubtitle = isCxP
+  ? `${userName} — Departamento y organización (comprobación en adelante)`
+  : `${userName} — Tus solicitudes con gastos por tramo`;
+---
+
+<MainLayout title="Resumen por tramos" data={{ userName, buttonLabel, role }}>
+  <main>
+    <EditorialHeader
+      eyebrow="Coco / Gastos / Tramos"
+      title="Resumen por tramos"
+      subtitle={listSubtitle}
+    />
+
+    <div class="flex mb-8">
+      <MetricCard label="Solicitudes" value={String(requests.length)} position="solo" />
+    </div>
+
+    {requests.length > 0 ? (
+      <section class="card-editorial overflow-hidden">
+        {requests.map((request, index) => {
+          const isLast = index === requests.length - 1;
+          const statusLabel = request.request_status || request.status || "—";
+          return (
+            <a
+              href={`/resumen-tramos/${request.request_id}`}
+              class={`block px-6 py-5 ${!isLast ? "border-b border-[var(--color-neutral-200)]" : ""} hover:bg-[var(--color-surface-secondary)] transition-colors`}
+            >
+              <div class="flex items-center justify-between gap-4 mb-1">
+                <div class="min-w-0">
+                  <span class="font-editorial text-lg text-[var(--color-ink)] tabular-nums">#{request.request_id}</span>
+                  <span class="text-sm text-[var(--color-ink-secondary)] ml-2">{request.label}</span>
+                </div>
+                <span class="status-pill status-pill--review shrink-0">{statusLabel}</span>
+              </div>
+              {isCxP && request.requester_name && (
+                <p class="text-xs text-[var(--color-ink-muted)]">{request.requester_name}</p>
+              )}
+              {(request.beginning_date || request.ending_date) && (
+                <p class="text-xs text-[var(--color-ink-muted)] mt-1">
+                  {request.beginning_date ?? "—"} — {request.ending_date ?? "—"}
+                </p>
+              )}
+            </a>
+          );
+        })}
+      </section>
+    ) : (
+      <div class="card-editorial py-16 text-center">
+        <p class="text-[var(--color-ink-muted)]">
+          {isCxP
+            ? "No hay solicitudes en comprobación o validación para mostrar."
+            : "No tienes solicitudes en fase de comprobación todavía."}
+        </p>
+      </div>
+    )}
+  </main>
+</MainLayout>

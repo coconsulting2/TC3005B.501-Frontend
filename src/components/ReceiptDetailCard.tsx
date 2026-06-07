@@ -20,6 +20,7 @@ export interface ReceiptCfdi {
   uuid: string;
   satEstado: string;
   tipoComprobante: string;
+  tipoCambio?: number;
 }
 
 export interface ReceiptFile {
@@ -201,6 +202,23 @@ export default function ReceiptDetailCard({
                 <span><strong className="text-[var(--color-ink-secondary)]">Moneda:</strong> {cfdi.moneda}</span>
               )}
             </div>
+
+            {cfdi.moneda && cfdi.moneda !== "MXN" && cfdi.tipoCambio != null && cfdi.tipoCambio > 0 && (
+              <div className="grid grid-cols-2 text-center divide-x divide-[var(--color-neutral-100)] border-t border-[var(--color-neutral-100)]">
+                <div className="px-3 py-2.5">
+                  <p className="text-[11px] text-[var(--color-ink-muted)] mb-0.5">Tipo de cambio</p>
+                  <p className="text-sm font-semibold text-[var(--color-ink)] tabular-nums">
+                    {cfdi.tipoCambio.toFixed(4)}
+                  </p>
+                </div>
+                <div className="px-3 py-2.5 bg-primary-50/30">
+                  <p className="text-[11px] text-primary-500 mb-0.5 font-medium">Equivalente MXN</p>
+                  <p className="text-sm font-bold text-primary-600 money-display tabular-nums">
+                    {fmtMoney(cfdi.total * cfdi.tipoCambio, "MXN")}
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         </details>
       )}

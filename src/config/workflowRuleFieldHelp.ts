@@ -29,11 +29,19 @@ const PARAM_VALUE_HELP: Record<WfParamType, string> = {
   nivel:
     "Nivel organizacional del solicitante (número). La regla aplica cuando coincide con el valor indicado.",
   gasto:
-    "ID del tipo de comprobante o gasto. La regla aplica si el viaje incluye ese tipo de gasto.",
+    "Tipo de comprobante del viaje. La regla aplica si el viaje incluye al menos un gasto de ese tipo.",
   destino:
-    "ID del país de destino. La regla aplica si algún tramo del viaje tiene ese destino.",
+    "País de destino del viaje. La regla aplica si algún tramo tiene ese destino.",
   moneda:
-    "Código ISO de moneda (ej. USD, MXN). La regla aplica si el anticipo está en esa moneda.",
+    "Moneda del anticipo (ISO 4217). La regla aplica si la solicitud está en esa moneda.",
+};
+
+const PARAM_VALUE_LABELS: Record<WfParamType, string> = {
+  importe: "Valor del parámetro",
+  nivel: "Nivel org. del solicitante",
+  gasto: "Tipo de gasto",
+  destino: "País de destino",
+  moneda: "Moneda",
 };
 
 /**
@@ -42,3 +50,12 @@ const PARAM_VALUE_HELP: Record<WfParamType, string> = {
 export function getParamValueHelp(paramType: WfParamType): string {
   return PARAM_VALUE_HELP[paramType] ?? "Valor específico de la condición seleccionada.";
 }
+
+/**
+ * @param paramType
+ */
+export function getParamValueLabel(paramType: WfParamType): string {
+  return PARAM_VALUE_LABELS[paramType] ?? "Valor del parámetro";
+}
+
+export const WORKFLOW_CURRENCY_OPTIONS = ["MXN", "USD", "EUR", "GBP", "CAD"] as const;
