@@ -28,14 +28,14 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
   const isAuthenticated = Boolean(role || token);
 
   if (url.pathname === "/") {
-    return Response.redirect(new URL("/login", request.url), 302);
+    return context.redirect("/login", 302);
   }
 
   // 1. Rutas públicas
   if (matchPath(pathname, publicRoutes)) {
     // Ya autenticado → no mostrar login otra vez
     if (pathname === '/login' && isAuthenticated) {
-      return Response.redirect(new URL('/dashboard', request.url), 302);
+      return context.redirect('/dashboard', 302);
     }
     return next();
   }
@@ -45,7 +45,7 @@ export const onRequest: MiddlewareHandler = async (context, next) => {
 
   // 2.1 Sin rol → login
   if (!role) {
-    return Response.redirect(new URL('/login', request.url), 302);
+    return context.redirect('/login', 302);
   }
 
   // 3. Validar si la ruta está registrada en el sistema
