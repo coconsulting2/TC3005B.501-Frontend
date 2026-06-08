@@ -1,7 +1,6 @@
 import { useCallback, useMemo, useState } from "react";
 import { apiRequest } from "@utils/apiClient";
 import { showAppAlert } from "@utils/appAlert";
-import type { FlightSegmentQuote } from "@utils/travelRequestAgency";
 import type { FlightSegmentQuote, NormalizedFlightOffer } from "@utils/travelRequestAgency";
 
 const IATA_SUGGESTIONS = [
